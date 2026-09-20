@@ -120,18 +120,40 @@ def _reset() -> None:
 
 
 def _select(key: str, label: str, options: list[str], *, icon: str | None = None,
-            disabled: bool = False, collapsed: bool = False) -> str:
+            disabled: bool = False, collapsed: bool = False, help: str | None = None) -> str:
     if st.session_state.get(key) not in options:
         st.session_state[key] = options[0]
     shown = f":material/{icon}: {label}" if icon else label
     return st.selectbox(
-        shown, options, key=key, disabled=disabled,
+        shown, options, key=key, disabled=disabled, help=help,
         label_visibility="collapsed" if collapsed else "visible",
     )
 
 
+def _dim_options(ds: Datasets, dim: str) -> tuple[list[str], str | None]:
+    """(choix, aide si le filtre est inactif). Les listes de référence ne servent
+    qu'avant le chargement des données."""
+    values = ds.values(dim)
+    if values:
+        return values, None
+    if ds.empty:
+        reference = C.REFERENCE_OPTIONS.get(dim)
+        if dim == "type_infrastructure":
+            reference = [label for label, _, _ in C.INFRA_TILES]
+        if reference:
+            return list(reference), None
+        return [], "Ce filtre s'activera dès que vos données seront chargées."
+    return [], "Aucune colonne correspondante dans les données chargées."
+
+
 def render_sidebar(ds: Datasets) -> Filters:
     years = ds.years()
+    period_help = None
+    if not years:
+        if ds.empty:  # aperçu avant chargement : bornes issues de la configuration
+            years = list(range(C.PERIOD_FALLBACK[0], C.PERIOD_FALLBACK[1] + 1))
+        else:
+            period_help = "Aucune colonne « annee » dans les données chargées."
     with st.sidebar:
         with st.container(key="sb_head"):
             st.markdown(
@@ -144,25 +166,25 @@ def render_sidebar(ds: Datasets) -> Filters:
         # Période
         periods = period_options(years)
         period = _select("f_periode", "Période", periods, icon="calendar_month",
-                         disabled=not years)
+                         disabled=not years, help=period_help)
 
         chosen: dict[str, str | None] = {}
         prefectures = ds.prefectures_by_region()
         for dim, key, label, icon in _SIMPLE:
-            options = ds.values(dim)
+            options, hint = _dim_options(ds, dim)
             if dim == "prefecture":
                 region = st.session_state.get("f_region")
                 if region in prefectures:
                     options = prefectures[region]
             all_label = C.ALL_LABELS[dim]
             value = _select(key, label, [all_label] + options, icon=icon,
-                            disabled=not options)
+                            disabled=not options, help=hint)
             chosen[dim] = None if value == all_label else value
 
         with st.expander("Filtres avancés", icon=":material/filter_alt:", expanded=False):
             for dim, key, label in _ADVANCED:
-                options = ds.values(dim)
-                on = st.checkbox(label, key=key + "_on", disabled=not options)
+                options, hint = _dim_options(ds, dim)
+                on = st.checkbox(label, key=key + "_on", disabled=not options, help=hint)
                 all_label = C.ALL_LABELS[dim]
                 value = _select(key, label, [all_label] + options,
                                 disabled=not (on and options), collapsed=True)

@@ -3,6 +3,16 @@
 Déposez ici vos fichiers **réels** (CSV, `.xlsx`, `.xls` ou `.parquet`). Aucun jeu de données
 n'est fourni : l'application n'invente aucune valeur.
 
+Les fichiers peuvent aussi être envoyés depuis l'application (bouton « Charger des fichiers de
+données »). Les sous-dossiers sont lus, sauf `geo/`.
+
+**Classement automatique.** Un fichier est rangé d'après son nom (tableau ci-dessous) ; sinon
+d'après ses colonnes (`indicateur` + `valeur` → indicateurs ; `type_infrastructure` →
+infrastructures ; `couverture_internet_pct` → connectivité ; `region`, `secteur`, `statut`,
+`emplois`… → entreprises) ; sinon d'après des mots de son nom (agence, agent, antenne, fibre,
+wifi, data center, cloud… → infrastructures, avec le nom du fichier comme type). Plusieurs
+fichiers du même jeu sont concaténés.
+
 Les noms de fichiers reconnus (sans extension) :
 
 | Jeu de données | Noms acceptés |

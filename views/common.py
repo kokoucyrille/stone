@@ -56,15 +56,57 @@ def region_legend(regions: pd.DataFrame, value_format=fmt_int) -> str:
     return legend(rows, "lg--region")
 
 
+def upload_panel(ds) -> None:
+    """Envoi de fichiers dans data/ et diagnostic de reconnaissance."""
+    from utils import config as C
+    from utils.data_loader import SUPPORTED_SUFFIXES, save_uploads
+
+    with st.expander("Charger des fichiers de données", icon=":material/upload_file:"):
+        uploads = st.file_uploader(
+            "Fichiers CSV, Excel ou Parquet", accept_multiple_files=True,
+            type=[s.lstrip(".") for s in SUPPORTED_SUFFIXES], key="tdi_uploader",
+            label_visibility="collapsed",
+        )
+        saved = st.session_state.setdefault("_tdi_saved", set())
+        fresh = [u for u in uploads or [] if (u.name, u.size) not in saved]
+        if fresh:
+            try:
+                save_uploads(fresh, C.DATA_DIR)
+            except OSError as exc:
+                st.error(f"Écriture impossible dans {C.DATA_DIR} : {exc}")
+            else:
+                saved.update((u.name, u.size) for u in fresh)
+                st.rerun()
+        if ds.files:
+            lines = []
+            for f in ds.files:
+                if f.dataset:
+                    lines.append(f"- **{f.name}** → jeu « {f.dataset} » ({f.rows} lignes)")
+                else:
+                    cols = ", ".join(f.columns[:8]) or "—"
+                    lines.append(f"- **{f.name}** → non reconnu ({f.note}). Colonnes lues : {cols}")
+            st.markdown("\n".join(lines))
+        st.caption("Colonnes attendues : voir data/README.md. Les fichiers sont enregistrés dans data/.")
+
+
 def page_intro(ds) -> None:
-    """Message discret lorsque aucun fichier de données n'est détecté."""
+    """Message discret si aucun fichier n'est chargé ou si certains ne sont pas reconnus."""
     from components.layout import notice
+    from utils import config as C
     if ds.empty:
         notice(
-            "Aucune donnée détectée. Déposez vos fichiers dans "
-            "<b>data/</b> (voir <b>data/README.md</b>) : les indicateurs et graphiques "
-            "se remplissent automatiquement, sans valeur simulée."
+            "Aucune donnée chargée. Les filtres sont actifs et s'appliqueront dès que vos "
+            "fichiers seront chargés (dossier <b>data/</b> ou bouton ci-dessous), "
+            "sans valeur simulée."
         )
+        upload_panel(ds)
+    elif ds.unrecognized:
+        names = ", ".join(f.name for f in ds.unrecognized[:3])
+        notice(f"{len(ds.unrecognized)} fichier(s) non reconnu(s) : <b>{names}</b>. "
+               "Ouvrez « Charger des fichiers de données » pour voir les colonnes lues.")
+        upload_panel(ds)
+    elif any(name not in ds.frames for name in C.DATASET_FILES):
+        upload_panel(ds)  # jeux encore manquants : le panneau reste disponible, sans bandeau
 
 
 def missing(dataset: str, *columns: str) -> str:

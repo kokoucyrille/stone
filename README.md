@@ -32,12 +32,24 @@ data/                   VOS fichiers de données (voir data/README.md)
 tests/test_app.py       tests de fumée (pytest)
 ```
 
-## Données
+## Données et filtres
 
-Déposez dans `data/` les fichiers `entreprises`, `infrastructures`, `connectivite` et
-`indicateurs` (CSV, Excel ou Parquet). Les noms de colonnes sont reconnus avec ou sans
-accents et via des synonymes ; la liste complète est dans **`data/README.md`** et dans
-`utils/config.py` (`COLUMN_ALIASES`). Les fichiers sont rechargés automatiquement dès qu'ils changent.
+Déposez vos fichiers (CSV, Excel ou Parquet) dans `data/`, **ou** utilisez le bouton
+« Charger des fichiers de données » affiché sous le bandeau tant que des jeux manquent
+(les fichiers sont enregistrés dans `data/`). Les fichiers sont rechargés dès qu'ils changent.
+
+- **Classement automatique** : chaque fichier est rangé selon son nom (`entreprises`,
+  `infrastructures`, `connectivite`, `indicateurs`), sinon selon ses colonnes, sinon selon des
+  mots de son nom (agence, antenne, fibre, data center… → infrastructures ; le libellé du type
+  est alors tiré du nom du fichier). Sous-dossiers acceptés ; plusieurs fichiers d'un même
+  jeu sont concaténés. Un fichier non reconnu est signalé avec les colonnes lues.
+- **Colonnes** : reconnues avec ou sans accents et via des synonymes (`data/README.md`,
+  `utils/config.py` › `COLUMN_ALIASES`).
+- **Filtres** : les choix viennent exclusivement de vos données. Un filtre dont la colonne
+  n'existe pas est grisé avec une infobulle qui explique pourquoi. Avant tout chargement,
+  Période, Région et Secteur restent utilisables à partir de listes de référence
+  (`PERIOD_FALLBACK`, `REFERENCE_OPTIONS` dans `utils/config.py`) et la région choisie
+  s'illumine sur la carte ; aucune valeur n'est simulée.
 
 ## Règles de calcul
 

@@ -54,7 +54,7 @@ def render(ds: Datasets, f: Filters) -> None:
                 else:
                     empty_state(300, hint=missing("entreprises", "region", "nombre"))
             with map_col:
-                plot(charts.region_map(usable, 470, unit, fmt), "terr_map")
+                plot(charts.region_map(usable, 470, unit, fmt, highlight=f.region), "terr_map")
     with right:
         with st.container(key="card_terr_table"):
             card_title("table_chart", "Synthèse par territoire")

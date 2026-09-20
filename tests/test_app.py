@@ -91,3 +91,57 @@ def test_missing_data_never_shows_numbers(empty_dir):
     at = _fresh_app(empty_dir).run()
     html = " ".join(m.value for m in at.markdown)
     assert "Donnée non disponible" in html
+
+
+def test_filters_are_active_without_data(empty_dir):
+    at = _fresh_app(empty_dir).run()
+    assert not at.exception
+    region = at.selectbox(key="f_region")
+    assert "Kara" in region.options and not region.disabled
+    assert at.selectbox(key="f_periode").options[0] == "2020 - 2025"
+    region.select("Kara").run()
+    assert not at.exception  # le filtre est appliqué sans planter, aucune valeur inventée
+    assert "Donnée non disponible" in " ".join(m.value for m in at.markdown)
+
+
+def test_reference_lists_are_dropped_once_data_is_loaded(sample_dir):
+    at = _fresh_app(sample_dir).run()
+    # « Télécoms » vient de la liste de référence : absent des données de la fixture.
+    assert "Télécoms" in at.selectbox(key="f_secteur").options  # présent dans la fixture
+    assert "Services IT" not in at.selectbox(key="f_secteur").options
+
+
+def test_files_are_classified_by_columns(tmp_path):
+    (tmp_path / "sous_dossier").mkdir()
+    pd.DataFrame({"Région": ["Kara"], "Type d'infrastructure": ["Fibre optique"], "Nombre": [3]}
+                 ).to_csv(tmp_path / "sous_dossier" / "mes_sites.csv", index=False)
+    pd.DataFrame({"region": ["Kara", "Maritime"], "prefecture": ["Kozah", "Zio"]}
+                 ).to_csv(tmp_path / "agences_moov.csv", index=False)
+    pd.DataFrame({"region": ["Kara"], "prefecture": ["Bassar"]}
+                 ).to_csv(tmp_path / "agences_togocom.csv", index=False)
+    pd.DataFrame({"colonne_inconnue": [1]}).to_csv(tmp_path / "inconnu.csv", index=False)
+    _fresh_app(tmp_path)
+    from utils.data_loader import load_datasets
+    ds = load_datasets()
+    assert set(ds.frames) == {"infrastructures"}
+    infra = ds.frames["infrastructures"]
+    assert len(infra) == 4 and infra["nombre"].sum() == 6
+    assert set(infra["type_infrastructure"]) == {"Fibre optique", "Agences moov", "Agences togocom"}
+    assert [f.name for f in ds.unrecognized] == ["inconnu.csv"]
+
+
+def test_save_uploads_keeps_only_base_name(tmp_path):
+    _fresh_app(tmp_path)
+    from utils.data_loader import save_uploads
+
+    class Upload:
+        name = "../evil.csv"
+
+        def getvalue(self):
+            return b"region\nKara\n"
+
+    class Refused(Upload):
+        name = "script.py"
+
+    assert save_uploads([Upload(), Refused()], tmp_path / "data") == ["evil.csv"]
+    assert (tmp_path / "data" / "evil.csv").exists() and not (tmp_path / "evil.csv").exists()

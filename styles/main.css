@@ -285,6 +285,12 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 .page-head p { margin: 0; font-size: 13px; color: var(--muted); }
 .page-head { border-left: 4px solid var(--green); padding-left: 12px; margin-bottom: 2px; }
 
+/* Panneau de chargement de données (état vide uniquement) */
+[data-testid="stMain"] [data-testid="stExpander"] details {
+  background: var(--card); border: 1px solid var(--grid); border-radius: 10px;
+}
+[data-testid="stMain"] [data-testid="stExpander"] summary p { font-size: 13px; font-weight: 500; }
+
 /* Éléments Streamlit dans les cartes */
 [class*="st-key-card_"] [data-testid="stRadio"] label p { font-size: 12.5px; color: var(--slate); }
 [class*="st-key-card_"] [data-testid="stTabs"] button p { font-size: 13px; }

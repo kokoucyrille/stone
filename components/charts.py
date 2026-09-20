@@ -71,7 +71,7 @@ def _polygon_xy(geometry: dict) -> tuple[list, list]:
 
 
 def region_map(regions: pd.DataFrame | None, height: int = 420, unit: str = "entreprises",
-               value_format=fmt_int) -> go.Figure:
+               value_format=fmt_int, highlight: str | None = None) -> go.Figure:
     """Carte des régions ; sans données, les polygones restent neutres.
 
     Le tracé utilise des polygones Scatter (et non `go.Choropleth`) : aucune
@@ -92,10 +92,12 @@ def region_map(regions: pd.DataFrame | None, height: int = 420, unit: str = "ent
         name = props["region"]
         polygon_names.add(name)
         has = name in values
-        color = region_color(name, i) if has else C.COLORS["empty"]
+        selected = not values and highlight == name  # filtre actif, pas encore de données
+        color = region_color(name, i) if (has or selected) else C.COLORS["empty"]
         hover = (f"<b>{name}</b><br>{value_format(values[name])} {unit}"
                  + (f" ({fmt_pct(parts[name])})" if name in parts else "")
-                 if has else f"<b>{name}</b><br>Donnée non disponible")
+                 if has else f"<b>{name}</b><br>"
+                 + ("Région sélectionnée" if selected else "Donnée non disponible"))
         xs, ys = _polygon_xy(feature["geometry"])
         lons += [x for x in xs if x is not None]
         lats += [y for y in ys if y is not None]
@@ -111,7 +113,8 @@ def region_map(regions: pd.DataFrame | None, height: int = 420, unit: str = "ent
             x=[props["cx"]], y=[props["cy"] + (0.2 if near else 0)], mode="text", text=[label],
             hoverinfo="skip",
             showlegend=False,
-            textfont=dict(family=FONT, size=11, color=_text_color(color) if has else MUTED),
+            textfont=dict(family=FONT, size=11,
+                          color=_text_color(color) if (has or selected) else MUTED),
         ))
 
     # Régions localisables par un point (ex. Grand Lomé) absentes des polygones.

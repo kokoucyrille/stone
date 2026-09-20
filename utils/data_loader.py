@@ -1,7 +1,11 @@
 """Chargement des données réelles du projet.
 
-Le module détecte les fichiers présents dans ``data/`` (CSV, Excel, Parquet),
-renomme leurs colonnes vers le schéma canonique et nettoie les types.
+Le module scanne ``data/`` (sous-dossiers compris ; CSV, Excel, Parquet), renomme
+les colonnes vers le schéma canonique, nettoie les types et **classe chaque
+fichier** dans un jeu de données (entreprises, infrastructures, connectivité,
+indicateurs) d'après son nom, sinon d'après ses colonnes. Plusieurs fichiers d'un
+même jeu sont concaténés.
+
 Aucune valeur n'est jamais inventée : si un fichier ou une colonne manque, la
 visualisation concernée affiche un état vide explicite.
 """
@@ -17,22 +21,42 @@ from . import config as C
 from .formatting import norm_key
 
 SUPPORTED_SUFFIXES = (".csv", ".xlsx", ".xls", ".parquet")
+IGNORED_DIRS = {"geo"}
 
 _ALIAS_LOOKUP = {
     norm_key(alias): canon
     for canon, aliases in C.COLUMN_ALIASES.items()
     for alias in aliases
 }
+_ENTREPRISE_COLUMNS = {
+    "region", "prefecture", "secteur", "type_acteur", "statut", "taille",
+    "niveau_connexion", "emplois", "investissement_mds_fcfa", "investissement_fcfa",
+}
+_GENERIC_INFRA_STEMS = {norm_key(s) for s in C.DATASET_FILES["infrastructures"]}
+
+
+@dataclass
+class FileInfo:
+    """Diagnostic d'un fichier lu (affiché si un fichier n'est pas reconnu)."""
+    name: str
+    dataset: str | None
+    rows: int = 0
+    columns: list[str] = field(default_factory=list)
+    note: str = ""
 
 
 @dataclass
 class Datasets:
     frames: dict[str, pd.DataFrame] = field(default_factory=dict)
-    notes: list[str] = field(default_factory=list)
+    files: list[FileInfo] = field(default_factory=list)
 
     @property
     def empty(self) -> bool:
         return not self.frames
+
+    @property
+    def unrecognized(self) -> list[FileInfo]:
+        return [f for f in self.files if f.dataset is None]
 
     def get(self, name: str) -> pd.DataFrame | None:
         return self.frames.get(name)
@@ -92,31 +116,25 @@ def _read_file(path: Path) -> pd.DataFrame:
     raise ValueError(f"format non pris en charge : {suffix}")
 
 
-def _discover(data_dir: Path) -> dict[str, Path]:
-    """Associe chaque jeu de données au premier fichier reconnu."""
+def candidate_files(data_dir: Path) -> list[Path]:
+    """Fichiers de données du dossier (sous-dossiers inclus), hors `geo/` et fichiers cachés."""
     if not data_dir.exists():
-        return {}
-    files = sorted(
-        p for p in data_dir.iterdir()
-        if p.is_file() and p.suffix.lower() in SUPPORTED_SUFFIXES
-        and not p.name.startswith((".", "~$"))
-    )
-    by_stem = {}
-    for path in files:
-        by_stem.setdefault(norm_key(path.stem), path)
-    found: dict[str, Path] = {}
-    for dataset, stems in C.DATASET_FILES.items():
-        for stem in stems:
-            if norm_key(stem) in by_stem:
-                found[dataset] = by_stem[norm_key(stem)]
-                break
+        return []
+    found = []
+    for path in sorted(data_dir.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in SUPPORTED_SUFFIXES:
+            continue
+        parts = path.relative_to(data_dir).parts
+        if any(p.startswith((".", "~$", "_")) or p.lower() in IGNORED_DIRS for p in parts):
+            continue
+        found.append(path)
     return found
 
 
 def _signature(data_dir: Path) -> tuple:
     return tuple(
-        (name, path.stat().st_mtime_ns, path.stat().st_size)
-        for name, path in sorted(_discover(data_dir).items())
+        (str(p.relative_to(data_dir)), p.stat().st_mtime_ns, p.stat().st_size)
+        for p in candidate_files(data_dir)
     )
 
 
@@ -148,8 +166,8 @@ def _to_number(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce")
 
 
-def _normalize(df: pd.DataFrame, dataset: str) -> pd.DataFrame:
-    # 1. Colonnes -> schéma canonique (premier alias rencontré l'emporte).
+def _canonicalize(df: pd.DataFrame) -> pd.DataFrame:
+    """Renomme les colonnes reconnues vers le schéma canonique (les autres sont écartées)."""
     rename: dict[str, str] = {}
     taken: set[str] = set()
     for col in df.columns:
@@ -157,9 +175,37 @@ def _normalize(df: pd.DataFrame, dataset: str) -> pd.DataFrame:
         if canon and canon not in taken:
             rename[col] = canon
             taken.add(canon)
-    df = df.rename(columns=rename)[list(rename.values())].copy()
+    return df.rename(columns=rename)[list(rename.values())].copy()
 
-    # 2. Types.
+
+def _pretty_stem(stem: str) -> str:
+    text = stem.replace("_", " ").replace("-", " ").strip()
+    return text[:1].upper() + text[1:]
+
+
+def classify(path: Path, df: pd.DataFrame) -> str | None:
+    """Jeu de données d'un fichier : nom reconnu, sinon colonnes, sinon mots-clés du nom."""
+    stem = norm_key(path.stem)
+    for dataset, stems in C.DATASET_FILES.items():
+        if stem in {norm_key(s) for s in stems}:
+            return dataset
+    cols = set(df.columns)
+    if {"indicateur", "valeur"} <= cols:
+        return "indicateurs"
+    if "type_infrastructure" in cols:
+        return "infrastructures"
+    if "couverture_internet_pct" in cols and not cols & {
+        "secteur", "emplois", "type_acteur", "statut", "taille"
+    }:
+        return "connectivite"
+    if any(word in stem for word in C.INFRA_STEM_WORDS):
+        return "infrastructures"
+    if cols & _ENTREPRISE_COLUMNS:
+        return "entreprises"
+    return None
+
+
+def _clean(df: pd.DataFrame, dataset: str, path: Path) -> pd.DataFrame:
     for col in C.TEXT_COLUMNS:
         if col in df.columns:
             df[col] = df[col].astype("string").str.strip().replace("", pd.NA)
@@ -172,7 +218,9 @@ def _normalize(df: pd.DataFrame, dataset: str) -> pd.DataFrame:
         if col in df.columns:
             df[col] = _to_number(df[col])
 
-    # 3. Mesures dérivées.
+    if dataset == "infrastructures" and "type_infrastructure" not in df.columns \
+            and norm_key(path.stem) not in _GENERIC_INFRA_STEMS:
+        df["type_infrastructure"] = _pretty_stem(path.stem)  # libellé tiré du nom du fichier
     if dataset in ("entreprises", "infrastructures") and "nombre" not in df.columns:
         df["nombre"] = 1.0
     if "investissement_mds_fcfa" not in df.columns and "investissement_fcfa" in df.columns:
@@ -188,24 +236,44 @@ def _normalize(df: pd.DataFrame, dataset: str) -> pd.DataFrame:
 # API publique
 # --------------------------------------------------------------------------- #
 @st.cache_data(show_spinner=False)
-def _load(signature: tuple, data_dir: str) -> tuple[dict[str, pd.DataFrame], list[str]]:
-    frames: dict[str, pd.DataFrame] = {}
-    notes: list[str] = []
-    for dataset, path in _discover(Path(data_dir)).items():
+def _load(signature: tuple, data_dir: str) -> tuple[dict[str, pd.DataFrame], list[FileInfo]]:
+    root = Path(data_dir)
+    parts: dict[str, list[pd.DataFrame]] = {}
+    files: list[FileInfo] = []
+    for path in candidate_files(root):
+        rel = str(path.relative_to(root))
         try:
-            df = _normalize(_read_file(path), dataset)
+            raw = _read_file(path)
         except Exception as exc:  # fichier illisible : on le signale sans planter
-            notes.append(f"{path.name} : lecture impossible ({exc}).")
+            files.append(FileInfo(rel, None, note=f"lecture impossible ({exc})"))
             continue
-        if df.empty or not len(df.columns):
-            notes.append(f"{path.name} : aucune colonne reconnue.")
+        df = _canonicalize(raw)
+        dataset = classify(path, df) if len(df.columns) else None
+        if dataset is None:
+            files.append(FileInfo(rel, None, len(raw), [str(c) for c in raw.columns],
+                                  "aucune colonne reconnue"))
             continue
-        frames[dataset] = df
-        notes.append(f"{path.name} : {len(df):,} lignes, colonnes {', '.join(df.columns)}.")
-    return frames, notes
+        df = _clean(df, dataset, path)
+        parts.setdefault(dataset, []).append(df)
+        files.append(FileInfo(rel, dataset, len(df), list(df.columns)))
+    frames = {name: pd.concat(dfs, ignore_index=True, sort=False) for name, dfs in parts.items()}
+    return frames, files
 
 
 def load_datasets() -> Datasets:
     data_dir = Path(C.DATA_DIR)
-    frames, notes = _load(_signature(data_dir), str(data_dir))
-    return Datasets(frames=frames, notes=notes)
+    frames, files = _load(_signature(data_dir), str(data_dir))
+    return Datasets(frames=frames, files=files)
+
+
+def save_uploads(uploads, dest: Path) -> list[str]:
+    """Enregistre des fichiers téléversés dans `dest` (nom de base uniquement)."""
+    dest.mkdir(parents=True, exist_ok=True)
+    saved = []
+    for upload in uploads:
+        name = Path(str(upload.name)).name
+        if Path(name).suffix.lower() not in SUPPORTED_SUFFIXES:
+            continue
+        (dest / name).write_bytes(upload.getvalue())
+        saved.append(name)
+    return saved

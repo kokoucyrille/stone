@@ -31,7 +31,7 @@ def _region_card(ds: Datasets, f: Filters) -> None:
                 st.markdown(region_legend(regions), unsafe_allow_html=True)
         with map_col:
             usable = regions if (regions is not None and not regions.empty) else None
-            plot(charts.region_map(usable, H_MAP), "dash_map")
+            plot(charts.region_map(usable, H_MAP, highlight=f.region), "dash_map")
 
 
 def _evolution_card(ds: Datasets, f: Filters) -> None:

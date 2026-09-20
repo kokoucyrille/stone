@@ -160,6 +160,21 @@ KEY_INDICATORS = [
     ("Objectif 2025", ("objectif",), "track_changes"),
 ]
 
+# Mots du nom de fichier qui désignent des infrastructures (ex. « agences_moov.csv »).
+INFRA_STEM_WORDS = (
+    "infra", "agence", "agent", "antenne", "relais", "fibre", "wifi", "wi_fi", "hotspot",
+    "data_center", "datacenter", "cloud", "hebergement", "point_d_acces", "pylone",
+)
+
+# Aperçu avant chargement des données : bornes de la période et listes de choix.
+# Elles ne servent QUE lorsqu'aucune donnée n'est chargée ; dès qu'un fichier est
+# présent, les choix des filtres viennent exclusivement de vos données.
+PERIOD_FALLBACK = (2020, 2025)
+REFERENCE_OPTIONS = {
+    "region": ["Grand Lomé", "Maritime", "Plateaux", "Centrale", "Kara", "Savanes"],
+    "secteur": ["Télécoms", "Services IT", "Fintech", "E-commerce", "EdTech"],
+}
+
 ALL_LABELS = {
     "region": "Toutes les régions",
     "prefecture": "Toutes les préfectures",
