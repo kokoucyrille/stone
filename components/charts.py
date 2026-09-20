@@ -163,11 +163,12 @@ def evolution_chart(series: pd.Series, height: int = 230, name: str = "Entrepris
         hovertemplate="%{x} : <b>%{y:,.0f}</b><extra></extra>", cliponaxis=False,
     ))
     top = max(values) if values else 1
-    fig.update_layout(**_layout(height, margin=dict(l=44, r=18, t=22, b=26), showlegend=False))
+    fig.update_layout(**_layout(height, margin=dict(l=58, r=18, t=22, b=26), showlegend=False))
     fig.update_xaxes(tickmode="array", tickvals=years, showgrid=False, linecolor=GRID,
                      tickfont=dict(size=11, color=MUTED), fixedrange=True)
     fig.update_yaxes(range=[0, top * 1.22], gridcolor=GRID, zeroline=False, tickformat=",d",
-                     tickfont=dict(size=11, color=MUTED), fixedrange=True, nticks=6)
+                     tickfont=dict(size=11, color=MUTED), fixedrange=True, nticks=6,
+                     title=dict(text="Entreprises", font=dict(size=11, color=MUTED), standoff=4))
     return fig
 
 
@@ -247,11 +248,11 @@ def vertical_bars(df: pd.DataFrame, height: int = 190, colors: list[str] | None 
     ))
     top = max(100.0, float(df["valeur"].max())) if percent else float(df["valeur"].max()) * 1.18
     fig.update_layout(**_layout(height, margin=dict(l=40, r=6, t=22, b=22), showlegend=False))
-    fig.update_xaxes(showgrid=False, linecolor=GRID, tickfont=dict(size=10, color=MUTED),
+    fig.update_xaxes(showgrid=False, linecolor=GRID, tickfont=dict(size=11, color=MUTED),
                      fixedrange=True, tickmode="array", tickvals=list(df["label"]),
                      ticktext=[str(l).replace(" ", "<br>") for l in df["label"]], tickangle=0)
     fig.update_yaxes(range=[0, top * (1.02 if percent else 1)], gridcolor=GRID, zeroline=False,
-                     tickfont=dict(size=10.5, color=MUTED), fixedrange=True,
+                     tickfont=dict(size=11, color=MUTED), fixedrange=True,
                      ticksuffix="%" if percent else "", tickformat=",d", nticks=6)
     return fig
 
@@ -303,18 +304,19 @@ def compare_lines(series: dict[str, pd.Series], colors: dict[str, str], height: 
             x=xs, y=ys, mode="lines+markers+text", name=name,
             line=dict(color=color, width=2.6),
             marker=dict(size=7, color="#FFFFFF", line=dict(color=color, width=2.2)),
-            text=labels, textposition="top center", textfont=dict(size=11, color=color),
+            text=labels, textposition="top center", textfont=dict(size=11.5, color=NAVY),
             hovertemplate=f"<b>{name}</b> · %{{x}} : %{{y:,.0f}}<extra></extra>", cliponaxis=False,
         ))
     years = sorted({int(y) for s in series.values() for y in s.index})
     fig.update_layout(**_layout(
-        height, margin=dict(l=44, r=22, t=30, b=26),
+        height, margin=dict(l=58, r=22, t=30, b=26),
         legend=dict(orientation="h", x=0, y=1.16, font=dict(size=11.5)),
     ))
     fig.update_xaxes(tickmode="array", tickvals=years, showgrid=False, linecolor=GRID,
                      tickfont=dict(size=11, color=MUTED), fixedrange=True)
     fig.update_yaxes(range=[0, top * 1.22], gridcolor=GRID, zeroline=False, tickformat=",d",
-                     tickfont=dict(size=11, color=MUTED), fixedrange=True, nticks=6)
+                     tickfont=dict(size=11, color=MUTED), fixedrange=True, nticks=6,
+                     title=dict(text="Entreprises", font=dict(size=11, color=MUTED), standoff=4))
     return fig
 
 
@@ -330,7 +332,7 @@ def grouped_hbars(table: pd.DataFrame, colors: dict[str, str], height: int = 200
             y=labels, x=vals, name=str(name), orientation="h",
             marker=dict(color=colors.get(name, C.COLORS["green"])),
             text=[fmt(v) if (v and not stack) else "" for v in vals],
-            textposition="outside", textfont=dict(size=10.5, color=NAVY), cliponaxis=False,
+            textposition="outside", textfont=dict(size=11, color=NAVY), cliponaxis=False,
             hovertemplate=f"<b>%{{y}}</b> · {name} : %{{x:,.1f}}" + ("%" if percent else "")
                           + "<extra></extra>",
         ))

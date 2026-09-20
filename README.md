@@ -51,6 +51,39 @@ Déposez vos fichiers (CSV, Excel ou Parquet) dans `data/`, **ou** utilisez le b
   (`PERIOD_FALLBACK`, `REFERENCE_OPTIONS` dans `utils/config.py`) et la région choisie
   s'illumine sur la carte ; aucune valeur n'est simulée.
 
+## Photo du bandeau et icône d'onglet
+
+- **Photo** : déposez votre photographie dans `assets/` sous le nom `banner_lome.jpg`
+  (`.jpeg`, `.png` ou `.webp` acceptés ; le fichier le plus récent est utilisé). Elle est recadrée,
+  réduite à 2 400 px de large et recompressée automatiquement, sans modifier le code. Format conseillé :
+  panorama d'environ 3 200 × 640 px (5:1), sujet principal au centre-droit (la partie gauche est
+  couverte par le texte du slogan). Ajustez le cadrage avec `TDI_BANNER_FOCUS` (ex. `center 40%`).
+  `TDI_BANNER=/chemin/photo.jpg` permet aussi de pointer vers un fichier hors du projet.
+  Utilisez une photo dont vous détenez les droits, ou libre de droits (vérifiez la licence et la
+  mention d'attribution éventuelle).
+- **Icône d'onglet** : drapeau du Togo par défaut ; `TDI_FAVICON=logo` pour le logo de la plateforme.
+  Les fichiers sont `assets/favicon_flag.png` et `assets/favicon.png` (remplaçables, PNG carré).
+
+Prompt utilisable dans un générateur d'images pour obtenir une photo réaliste de Lomé :
+
+> Photographie réaliste haute résolution, panorama très large (format 5:1, 3200×640 px), front de mer
+> de Lomé au Togo en fin de matinée : golfe de Guinée turquoise, plage de sable doré bordée de
+> cocotiers, skyline de Lomé avec la tour de l'Hôtel du 2 Février dominant des immeubles modernes et
+> des bâtiments bas aux toits rouges, grues du port autonome de Lomé à l'horizon, quelques pirogues de
+> pêcheurs, lumière naturelle chaude, ciel bleu avec quelques cumulus. Style photo documentaire, sans
+> texte, sans logo, sans personne identifiable, sujet principal au centre-droit, zone gauche calme.
+
+## Ergonomie et navigation
+
+- **Vue restituée** : page, période et filtres sont dans l'adresse du navigateur ; un rafraîchissement ou un
+  lien copié retrouve la même vue.
+- **Barre « Vue active »** : rappelle la période, les filtres et la comparaison en cours.
+- **Flèche « Détail »** dans l'en-tête des cartes du tableau de bord : ouvre la vue détaillée correspondante.
+- **Sidebar repliable** (chevron en haut à droite) pour gagner de la place lors d'une présentation.
+- **Accessibilité** : contours de focus visibles, contrastes AA, libellés conservés pour les lecteurs d'écran,
+  info-bulles de définition sur les KPI, ligne de sources et de date de mise à jour en bas de page.
+- Détail des mesures : `docs/AUDIT_ERGONOMIE.md`.
+
 ## Comparaison de deux valeurs
 
 Chaque champ de filtre (sauf la période) accepte **jusqu'à 2 valeurs** : sélectionnez-en deux
@@ -92,8 +125,9 @@ déposez `data/geo/regions.geojson` (propriétés `region`, `cx`, `cy`) pour la 
 
 ## Limites connues
 
-- La photo du bandeau (`assets/banner_lome.jpg`) est recadrée dans la maquette : basse
-  résolution. Remplacez-la par une photographie de Lomé (mêmes proportions, ~1200 × 250 px).
+- La photo fournie par défaut (`assets/banner_lome.jpg`) est recadrée dans la maquette : basse
+  résolution et peu spécifique au Togo. Remplacez-la par une vraie photographie de Lomé (voir
+  « Photo du bandeau et icône d'onglet »).
 - « Grand Lomé » (6e région de la maquette) n'existe pas dans le géojson officiel à 5 régions :
   si vos données l'utilisent, elle est tracée en pastille sur Lomé.
 - La police Inter est chargée depuis Google Fonts ; hors connexion, une police système est utilisée.

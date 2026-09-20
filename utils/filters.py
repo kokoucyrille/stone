@@ -185,6 +185,7 @@ def render_sidebar(ds: Datasets) -> Filters:
 
         # Période (sélection unique)
         periods = period_options(years)
+        st.session_state["_period_default"] = periods[0]
         period = _select("f_periode", "Période", periods, icon="calendar_month",
                          disabled=not years, help=period_help)
 
@@ -209,8 +210,9 @@ def render_sidebar(ds: Datasets) -> Filters:
                 chosen[dim] = picked if on else ()
 
         st.markdown(
-            '<div class="sb-hint">Astuce : choisissez 2 valeurs dans un même champ '
-            "pour les comparer.</div>",
+            '<div class="sb-hint">Astuce : choisissez 2 valeurs dans un même champ pour les '
+            "comparer. L'adresse du navigateur garde la page et les filtres : copiez-la pour "
+            "partager la vue.</div>",
             unsafe_allow_html=True,
         )
         st.markdown(_sidebar_decoration(), unsafe_allow_html=True)

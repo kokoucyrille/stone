@@ -5,7 +5,7 @@ import streamlit as st
 
 from components import charts
 from components.kpi import infra_strip
-from components.layout import card_title, compare_bar, empty_state, page_header, show_table
+from components.layout import card_title, context_bar, empty_state, page_header, show_table
 from utils import metrics as M
 from utils.compare import get_comparison
 from utils.data_loader import Datasets
@@ -20,7 +20,7 @@ def render(ds: Datasets, f: Filters) -> None:
     page_header("Infrastructures", "Parc d'infrastructures numériques par type et par territoire.")
     page_intro(ds)
     cmp = get_comparison(f)
-    compare_bar(cmp)
+    context_bar(f, cmp)
 
     with st.container(key="card_inf_strip"):
         compare = infra_compare(ds, f, cmp)

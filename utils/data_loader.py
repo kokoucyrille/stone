@@ -43,6 +43,7 @@ class FileInfo:
     rows: int = 0
     columns: list[str] = field(default_factory=list)
     note: str = ""
+    modified: float = 0.0
 
 
 @dataclass
@@ -245,17 +246,17 @@ def _load(signature: tuple, data_dir: str) -> tuple[dict[str, pd.DataFrame], lis
         try:
             raw = _read_file(path)
         except Exception as exc:  # fichier illisible : on le signale sans planter
-            files.append(FileInfo(rel, None, note=f"lecture impossible ({exc})"))
+            files.append(FileInfo(rel, None, note=f"lecture impossible ({exc})", modified=path.stat().st_mtime))
             continue
         df = _canonicalize(raw)
         dataset = classify(path, df) if len(df.columns) else None
         if dataset is None:
             files.append(FileInfo(rel, None, len(raw), [str(c) for c in raw.columns],
-                                  "aucune colonne reconnue"))
+                                  "aucune colonne reconnue", path.stat().st_mtime))
             continue
         df = _clean(df, dataset, path)
         parts.setdefault(dataset, []).append(df)
-        files.append(FileInfo(rel, dataset, len(df), list(df.columns)))
+        files.append(FileInfo(rel, dataset, len(df), list(df.columns), modified=path.stat().st_mtime))
     frames = {name: pd.concat(dfs, ignore_index=True, sort=False) for name, dfs in parts.items()}
     return frames, files
 

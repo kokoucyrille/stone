@@ -209,3 +209,72 @@ def test_compared_values_match_an_independent_pandas_computation(sample_dir):
         sub = raw[raw["Région"] == region]
         assert row[0].value == len(sub)             # entreprises
         assert row[1].value == sub["Emplois"].sum()  # emplois
+
+
+def test_favicons_exist_and_are_square_png():
+    from PIL import Image
+    for name in ("favicon.png", "favicon_flag.png"):
+        img = Image.open(ROOT / "assets" / name)
+        assert img.format == "PNG" and img.width == img.height >= 128
+
+
+def test_banner_photo_is_resized_and_bad_files_are_tolerated(tmp_path):
+    from PIL import Image
+    big = tmp_path / "photo.jpg"
+    Image.new("RGB", (5000, 1000), (30, 120, 200)).save(big, "JPEG")
+    os.environ["TDI_BANNER"] = str(big)
+    try:
+        _fresh_app(tmp_path)
+        from components import layout
+        assert layout.banner_path() == big
+        uri = layout._banner_uri(str(big), big.stat().st_mtime_ns)
+        import base64, io
+        img = Image.open(io.BytesIO(base64.b64decode(uri.split(",", 1)[1])))
+        assert img.width == 2400 and img.height == 480
+        broken = tmp_path / "cassee.jpg"
+        broken.write_bytes(b"pas une image")
+        assert layout._banner_uri(str(broken), 1) == ""
+    finally:
+        os.environ.pop("TDI_BANNER", None)
+
+
+def test_url_restores_page_and_filters(sample_dir):
+    at = _fresh_app(sample_dir)
+    at.query_params["page"] = "secteurs"
+    at.query_params["region"] = "Kara|Savanes"
+    at.run()
+    assert not at.exception, at.exception
+    assert at.multiselect(key="f_region").value == ["Kara", "Savanes"]
+    assert '<div class="page-head"><h1>Secteurs</h1>' in _html(at)
+
+
+def test_invalid_url_values_are_ignored(sample_dir):
+    at = _fresh_app(sample_dir)
+    at.query_params["page"] = "inconnue"
+    at.query_params["region"] = "Atlantide|Kara|Kara2|Maritime"
+    at.run()
+    assert not at.exception
+    assert at.multiselect(key="f_region").value == ["Kara"] or len(at.multiselect(key="f_region").value) <= 2
+    assert "Tableau de bord" in _html(at) or 'class="hero"' in _html(at)
+
+
+def test_active_view_bar_only_appears_with_filters(sample_dir):
+    at = _fresh_app(sample_dir).run()
+    assert 'class="ctx"' not in _html(at)
+    at.multiselect(key="f_region").select("Kara").run()
+    assert 'class="ctx"' in _html(at) and "Kara" in _html(at)
+
+
+def test_card_detail_button_opens_the_detailed_view(sample_dir):
+    at = _fresh_app(sample_dir).run()
+    at.button(key="go_map_territoires").click().run()
+    assert not at.exception
+    assert '<div class="page-head"><h1>Territoires</h1>' in _html(at)
+
+
+def test_sources_line_and_kpi_definitions(sample_dir):
+    at = _fresh_app(sample_dir).run()
+    html = _html(at)
+    assert "Sources : entreprises.csv, infrastructures.csv" in html
+    assert "Année de référence 2025" in html
+    assert 'title="Nombre d\'entreprises numériques à fin 2025.' in html

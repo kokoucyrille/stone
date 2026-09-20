@@ -27,7 +27,21 @@ def _cmp_row(k: Kpi | None, color: str) -> str:
             f'<span class="kpi__cv">{format_kpi_value(k)}</span>{delta}</div>')
 
 
-def kpi_row(kpis: list[Kpi], compare: list[list[Kpi | None]] | None = None, cmp=None) -> None:
+def _definition(key: str, ref: int | None) -> str:
+    at = f"à fin {ref}" if ref and C.STOCK_MODE != "instantane" else (f"en {ref}" if ref else "")
+    prev = f" Variation par rapport à {ref - 1}." if ref else ""
+    return {
+        "entreprises": f"Nombre d'entreprises numériques {at}.{prev}",
+        "emplois": f"Emplois liés aux entreprises numériques {at}.{prev}",
+        "couverture": "Dernière photographie disponible à la date de référence ; moyenne pondérée par "
+                      "la population si elle est fournie. Variation en points de pourcentage.",
+        "infrastructures": f"Nombre d'infrastructures numériques {at}.{prev}",
+        "investissements": f"Investissements en milliards de F CFA {at}.{prev}",
+    }.get(key, "")
+
+
+def kpi_row(kpis: list[Kpi], compare: list[list[Kpi | None]] | None = None, cmp=None,
+            ref: int | None = None) -> None:
     """Rangée de 5 KPI ; en comparaison, chaque carte porte une ligne par valeur (A / B)."""
     cards = []
     for idx, k in enumerate(kpis):
@@ -37,7 +51,7 @@ def kpi_row(kpis: list[Kpi], compare: list[list[Kpi | None]] | None = None, cmp=
             else:
                 body = "".join(_cmp_row(series[idx], cmp.color(i)) for i, series in enumerate(compare))
             cards.append(
-                f'<div class="kpi kpi--{k.tone} kpi--compare">'
+                f'<div class="kpi kpi--{k.tone} kpi--compare" title="{html_escape(_definition(k.key, ref))}">'
                 f'<div class="kpi__icon">{icon(k.icon)}</div>'
                 f'<div class="kpi__body"><div class="kpi__label">{html_escape(k.label)}</div>{body}</div></div>'
             )
@@ -55,7 +69,7 @@ def kpi_row(kpis: list[Kpi], compare: list[list[Kpi | None]] | None = None, cmp=
         else:
             delta = ""
         cards.append(
-            f'<div class="kpi kpi--{k.tone}">'
+            f'<div class="kpi kpi--{k.tone}" title="{html_escape(_definition(k.key, ref))}">'
             f'<div class="kpi__icon">{icon(k.icon)}</div>'
             '<div class="kpi__body">'
             f'<div class="kpi__label">{html_escape(k.label)}</div>'

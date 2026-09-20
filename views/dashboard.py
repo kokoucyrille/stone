@@ -5,7 +5,7 @@ import streamlit as st
 
 from components import charts
 from components.kpi import indicators_strip, infra_strip, kpi_row
-from components.layout import card_title, compare_bar, empty_state, hero, plot
+from components.layout import card_title, context_bar, empty_state, hero, plot
 from utils import metrics as M
 from utils.compare import get_comparison
 from utils.data_loader import Datasets
@@ -16,13 +16,14 @@ from .common import (ENTREPRISES_REGION_HINT, NO_RESULT, chart_block, compare_da
                      region_legend)
 
 # Hauteurs (px) réglées pour reproduire les proportions de la maquette.
-H_MAP, H_EVO, H_TOP, H_DONUT, H_NET = 416, 200, 148, 200, 148
+H_MAP, H_EVO, H_TOP, H_DONUT, H_NET = 346, 166, 124, 166, 122
 
 
 def _region_card(ds: Datasets, f: Filters, cmp) -> None:
     regions = M.by_region(ds, f)
     with st.container(key="card_map"):
-        card_title("location_on", "Répartition des entreprises numériques par région")
+        card_title("location_on", "Répartition des entreprises numériques par région",
+                   None, "territoires", "map")
         legend_col, map_col = st.columns([46, 54], vertical_alignment="center")
         with legend_col:
             if regions is None:
@@ -40,7 +41,8 @@ def _region_card(ds: Datasets, f: Filters, cmp) -> None:
 def _evolution_card(ds: Datasets, f: Filters, cmp) -> None:
     hint = missing("entreprises", "annee", "nombre")
     with st.container(key="card_evo"):
-        card_title("show_chart", "Évolution du nombre d'entreprises numériques")
+        card_title("show_chart", "Évolution du nombre d'entreprises numériques",
+                   None, "secteurs", "evo")
         if cmp.active:
             parts = compare_data(ds, f, cmp, M.evolution, "entreprises", H_EVO, hint)
             if parts is not None:
@@ -54,7 +56,7 @@ def _evolution_card(ds: Datasets, f: Filters, cmp) -> None:
 def _sector_card(ds: Datasets, f: Filters, cmp) -> None:
     hint = missing("entreprises", "secteur", "nombre")
     with st.container(key="card_sector"):
-        card_title("donut_large", "Répartition par secteur d'activité")
+        card_title("donut_large", "Répartition par secteur d'activité", None, "secteurs", "sector")
         if cmp.is_split("secteur"):
             grouped_block(ds, f, cmp, "secteur", H_DONUT, "dash_sector_cmp", hint, top=5)
         else:
@@ -64,7 +66,8 @@ def _sector_card(ds: Datasets, f: Filters, cmp) -> None:
 def _top_card(ds: Datasets, f: Filters, cmp) -> None:
     hint = missing("entreprises", "prefecture", "nombre")
     with st.container(key="card_top"):
-        card_title("account_balance", "Top 5 des préfectures par nombre d'entreprises")
+        card_title("account_balance", "Top 5 des préfectures par nombre d'entreprises",
+                   None, "territoires", "top")
         if cmp.is_split("prefecture"):
             stack = cmp.dim == "region"   # une préfecture n'appartient qu'à une région
             grouped_block(ds, f, cmp, "prefecture", H_TOP + (0 if stack else 36), "dash_top_cmp",
@@ -76,7 +79,7 @@ def _top_card(ds: Datasets, f: Filters, cmp) -> None:
 
 def _net_card(ds: Datasets, f: Filters, cmp) -> None:
     with st.container(key="card_net"):
-        card_title("signal_cellular_alt", "Accès à Internet par région")
+        card_title("signal_cellular_alt", "Accès à Internet par région", None, "territoires", "net")
         override = region_colors(cmp)
         chart_block(M.internet_by_region(ds, f), H_NET,
                     lambda d: charts.vertical_bars(
@@ -90,8 +93,8 @@ def render(ds: Datasets, f: Filters) -> None:
     hero()
     page_intro(ds)
     cmp = get_comparison(f)
-    compare_bar(cmp)
-    kpi_row(M.compute_kpis(ds, f), M.compare_kpis(ds, f, cmp) if cmp.active else None, cmp)
+    context_bar(f, cmp)
+    kpi_row(M.compute_kpis(ds, f), M.compare_kpis(ds, f, cmp) if cmp.active else None, cmp, f.end)
 
     col_left, col_mid, col_right = st.columns([385, 310, 305], gap="small")
     with col_left:
@@ -110,7 +113,8 @@ def render(ds: Datasets, f: Filters) -> None:
             compare = infra_compare(ds, f, cmp)
             if cmp.active and compare is None:
                 note = "Comparaison non applicable"
-            card_title("dns", "Répartition des infrastructures numériques", note)
+            card_title("dns", "Répartition des infrastructures numériques", note,
+                       "infrastructures", "infra")
             infra_strip(M.infra_tiles(ds, f), compare, cmp)
     with col_b:
         with st.container(key="card_ind"):

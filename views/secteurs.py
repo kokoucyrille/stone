@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from components import charts
-from components.layout import card_title, compare_bar, empty_state, page_header, plot, show_table
+from components.layout import card_title, context_bar, empty_state, page_header, plot, show_table
 from utils import metrics as M
 from utils.compare import by_series, get_comparison, stack_tables, supports
 from utils.data_loader import Datasets
@@ -20,7 +20,7 @@ def render(ds: Datasets, f: Filters) -> None:
     page_header("Secteurs", "Poids et dynamique des secteurs d'activité du numérique.")
     page_intro(ds)
     cmp = get_comparison(f)
-    compare_bar(cmp)
+    context_bar(f, cmp)
     split = cmp.is_split("secteur")
 
     a, b = st.columns([45, 55], gap="small")

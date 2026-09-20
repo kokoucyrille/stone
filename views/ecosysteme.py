@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from components import charts
-from components.layout import card_title, compare_bar, page_header
+from components.layout import card_title, context_bar, page_header
 from utils import metrics as M
 from utils.compare import get_comparison
 from utils.data_loader import Datasets
@@ -17,7 +17,7 @@ def render(ds: Datasets, f: Filters) -> None:
     page_header("Écosystème", "Acteurs du numérique : types, statuts et tailles.")
     page_intro(ds)
     cmp = get_comparison(f)
-    compare_bar(cmp)
+    context_bar(f, cmp)
 
     a, b, c = st.columns(3, gap="small")
     with a:

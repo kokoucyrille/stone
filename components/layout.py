@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import base64
+import io
+import os
 from functools import lru_cache
+from pathlib import Path
 
 import streamlit as st
 
@@ -24,6 +27,33 @@ def _inline_svg(filename: str) -> str:
     return (C.ASSETS_DIR / filename).read_text(encoding="utf-8")
 
 
+def banner_path() -> Path | None:
+    """Photo du bandeau : TDI_BANNER, sinon le fichier assets/banner_lome.* le plus récent."""
+    override = os.environ.get("TDI_BANNER")
+    if override and Path(override).is_file():
+        return Path(override)
+    found = [p for ext in (".jpg", ".jpeg", ".png", ".webp")
+             if (p := C.ASSETS_DIR / f"{C.BANNER_STEM}{ext}").is_file()]
+    return max(found, key=lambda p: p.stat().st_mtime_ns) if found else None
+
+
+@lru_cache(maxsize=4)
+def _banner_uri(path: str, mtime_ns: int) -> str:
+    """Photo redimensionnée (largeur max) et recompressée en JPEG, prête à être intégrée en CSS."""
+    from PIL import Image, ImageOps
+    try:
+        with Image.open(path) as raw:
+            img = ImageOps.exif_transpose(raw).convert("RGB")
+        if img.width > C.BANNER_MAX_WIDTH:
+            ratio = C.BANNER_MAX_WIDTH / img.width
+            img = img.resize((C.BANNER_MAX_WIDTH, max(1, round(img.height * ratio))), Image.LANCZOS)
+        buffer = io.BytesIO()
+        img.save(buffer, "JPEG", quality=86, optimize=True)
+    except Exception:  # image illisible : le bandeau reste sans photo, l'application démarre
+        return ""
+    return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
 def icon(name: str, extra_class: str = "") -> str:
     """Icône Material Symbols (police fournie avec Streamlit)."""
     return f'<span class="msr {extra_class}" aria-hidden="true">{name}</span>'
@@ -31,7 +61,10 @@ def icon(name: str, extra_class: str = "") -> str:
 
 def inject_css() -> None:
     css = (C.STYLES_DIR / "main.css").read_text(encoding="utf-8")
-    css = css.replace("__BANNER__", _data_uri("banner_lome.jpg", "image/jpeg"))
+    photo = banner_path()
+    uri = _banner_uri(str(photo), photo.stat().st_mtime_ns) if photo else ""
+    banner_var = f'url("{uri}")' if uri else "none"
+    css = css.replace("__BANNER_VAR__", banner_var).replace("__BANNER_POS__", C.BANNER_FOCUS)
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
@@ -112,31 +145,69 @@ def page_header(title: str, subtitle: str) -> None:
 # --------------------------------------------------------------------------- #
 # Cartes et états vides
 # --------------------------------------------------------------------------- #
-def compare_bar(cmp) -> None:
-    """Bandeau discret rappelant les deux valeurs comparées et leurs couleurs."""
-    if not cmp.active:
+def context_bar(f, cmp) -> None:
+    """Rappelle la vue courante : période et filtres actifs, comparaison A / B en couleurs."""
+    s = st.session_state
+    groups = []
+    if f.start is not None and s.get("f_periode") != s.get("_period_default"):
+        label = str(f.start) if f.single_year else f"{f.start} – {f.end}"
+        groups.append(("Période", f'<span class="ctx__chip">{html_escape(label)}</span>'))
+    for dim, values in f.dims().items():
+        name = C.DIM_LABELS[dim]
+        if cmp.active and dim == cmp.dim:
+            chips = '<span class="ctx__vs">contre</span>'.join(
+                f'<span class="ctx__chip"><i style="background:{cmp.color(i)}"></i>{html_escape(v)}</span>'
+                for i, v in enumerate(cmp.values)
+            )
+            groups.append((f"Comparaison · {name}", chips))
+        else:
+            chips = "".join(f'<span class="ctx__chip">{html_escape(v)}</span>' for v in values)
+            groups.append((name + (" (cumul)" if len(values) > 1 else ""), chips))
+    if not groups:
         return
-    chips = "".join(
-        f'<span class="cmp__chip"><i style="background:{cmp.color(i)}"></i>{html_escape(v)}</span>'
-        for i, v in enumerate(cmp.values)
+    body = "".join(
+        f'<span class="ctx__group"><span class="ctx__label">{html_escape(label)}</span>{chips}</span>'
+        for label, chips in groups
     )
-    extra = ""
-    if cmp.extra:
-        extra = ('<span class="cmp__note">Autres champs à 2 valeurs, cumulés : '
-                 f'{html_escape(", ".join(cmp.extra))}</span>')
     st.markdown(
-        f'<div class="cmp">{icon("compare_arrows")}<span class="cmp__title">Comparaison · '
-        f'{html_escape(cmp.label)}</span>{chips}{extra}</div>',
+        f'<div class="ctx" role="status">{icon("tune")}<span class="ctx__title">Vue active</span>{body}</div>',
         unsafe_allow_html=True,
     )
 
 
-def card_title(mat_icon: str, title: str, note: str | None = None) -> None:
+def source_note(ds, f) -> None:
+    """Ligne de sources en bas de page : fichiers utilisés, référence temporelle, mise à jour."""
+    from datetime import datetime
+    used = [fi for fi in ds.files if fi.dataset]
+    if not used:
+        return
+    names = sorted({Path(fi.name).name for fi in used})
+    shown = ", ".join(names[:4]) + (" …" if len(names) > 4 else "")
+    parts = [f"Sources : {shown}"]
+    if f.end:
+        parts.append(f"Année de référence {f.end}"
+                     + ("" if C.STOCK_MODE == "instantane" else " (valeurs cumulées)"))
+    parts.append("Fichiers mis à jour le " + datetime.fromtimestamp(max(fi.modified for fi in used)).strftime("%d/%m/%Y"))
+    st.markdown(
+        f'<div class="srcnote">{icon("info")}<span>{html_escape(" · ".join(parts))}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def card_title(mat_icon: str, title: str, note: str | None = None,
+               link: str | None = None, key: str | None = None) -> None:
+    """Titre de carte ; `link` = vue détaillée ouverte par le bouton « Détail »."""
     right = f'<span class="ct__note">{html_escape(note)}</span>' if note else ""
-    st.markdown(
-        f'<div class="ct">{icon(mat_icon)}<span>{html_escape(title)}</span>{right}</div>',
-        unsafe_allow_html=True,
-    )
+    head = (f'<div class="ct">{icon(mat_icon)}<span title="{html_escape(title)}">{html_escape(title)}</span>'
+            f'{right}</div>')
+    if not link:
+        st.markdown(head, unsafe_allow_html=True)
+        return
+    label = {k: lab for k, lab, _ in C.PAGES}[link]
+    with st.container(key=f"hdr_{key or link}"):
+        st.markdown(head, unsafe_allow_html=True)
+        st.button("Détail", icon=":material/arrow_forward:", key=f"go_{key or link}_{link}",
+                  type="tertiary", on_click=_go, args=(link,), help=f"Ouvrir la vue « {label} »")
 
 
 def empty_state(height: int, title: str = "Données non disponibles", hint: str = "") -> None:

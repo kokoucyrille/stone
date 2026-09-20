@@ -15,6 +15,16 @@ STYLES_DIR = ROOT / "styles"
 # Dossier des données : surchargeable via la variable d'environnement TDI_DATA_DIR.
 DATA_DIR = Path(os.environ.get("TDI_DATA_DIR", ROOT / "data"))
 
+# Icône de l'onglet du navigateur : "flag" (drapeau du Togo) ou "logo" (logo de la plateforme).
+FAVICON = os.environ.get("TDI_FAVICON", "flag")
+FAVICON_FILES = {"flag": "favicon_flag.png", "logo": "favicon.png"}
+
+# Photo du bandeau : le fichier assets/banner_lome.(jpg|jpeg|png|webp) le plus récent est utilisé
+# (ou le chemin donné par TDI_BANNER). BANNER_FOCUS = point de cadrage CSS de la photo.
+BANNER_STEM = "banner_lome"
+BANNER_FOCUS = os.environ.get("TDI_BANNER_FOCUS", "center 60%")
+BANNER_MAX_WIDTH = 2400
+
 APP_TITLE = "TOGO DIGITAL INTELLIGENCE"
 APP_SUBTITLE = (
     "Plateforme d'intelligence territoriale pour le pilotage de l'économie "
