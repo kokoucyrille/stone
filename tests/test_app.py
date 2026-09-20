@@ -68,7 +68,7 @@ def test_pages_with_data(sample_dir, page):
 
 def test_region_names_are_normalised(sample_dir):
     at = _fresh_app(sample_dir).run()
-    options = at.selectbox(key="f_region").options
+    options = at.multiselect(key="f_region").options
     assert "Maritime" in options and "Région Maritime" not in options
 
 
@@ -77,14 +77,14 @@ def test_filters_drive_kpis(sample_dir):
     html = " ".join(m.value for m in at.markdown)
     assert ">5<" in html  # 5 entreprises au total, aucune valeur inventée
 
-    at.selectbox(key="f_region").select("Kara").run()
+    at.multiselect(key="f_region").select("Kara").run()
     assert not at.exception
     html = " ".join(m.value for m in at.markdown)
     assert ">2<" in html  # 2 entreprises à Kara
-    assert at.selectbox(key="f_prefecture").options == ["Toutes les préfectures", "Bassar", "Kozah"]
+    assert at.multiselect(key="f_prefecture").options == ["Bassar", "Kozah"]
 
     at.button(key="btn_reset").click().run()
-    assert at.selectbox(key="f_region").value == "Toutes les régions"
+    assert at.multiselect(key="f_region").value == []
 
 
 def test_missing_data_never_shows_numbers(empty_dir):
@@ -96,7 +96,7 @@ def test_missing_data_never_shows_numbers(empty_dir):
 def test_filters_are_active_without_data(empty_dir):
     at = _fresh_app(empty_dir).run()
     assert not at.exception
-    region = at.selectbox(key="f_region")
+    region = at.multiselect(key="f_region")
     assert "Kara" in region.options and not region.disabled
     assert at.selectbox(key="f_periode").options[0] == "2020 - 2025"
     region.select("Kara").run()
@@ -107,8 +107,8 @@ def test_filters_are_active_without_data(empty_dir):
 def test_reference_lists_are_dropped_once_data_is_loaded(sample_dir):
     at = _fresh_app(sample_dir).run()
     # « Télécoms » vient de la liste de référence : absent des données de la fixture.
-    assert "Télécoms" in at.selectbox(key="f_secteur").options  # présent dans la fixture
-    assert "Services IT" not in at.selectbox(key="f_secteur").options
+    assert "Télécoms" in at.multiselect(key="f_secteur").options  # présent dans la fixture
+    assert "Services IT" not in at.multiselect(key="f_secteur").options
 
 
 def test_files_are_classified_by_columns(tmp_path):
@@ -145,3 +145,67 @@ def test_save_uploads_keeps_only_base_name(tmp_path):
 
     assert save_uploads([Upload(), Refused()], tmp_path / "data") == ["evil.csv"]
     assert (tmp_path / "data" / "evil.csv").exists() and not (tmp_path / "evil.csv").exists()
+
+
+def _html(at):
+    return " ".join(m.value for m in at.markdown)
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_comparison_of_two_regions_on_every_page(sample_dir, page):
+    at = _fresh_app(sample_dir).run()
+    at.multiselect(key="f_region").select("Kara").select("Savanes").run()
+    at = _click(at, page) if page != "dashboard" else at
+    assert not at.exception, at.exception
+    assert "Comparaison" in _html(at)
+
+
+def test_kpis_show_one_value_per_compared_selection(sample_dir):
+    at = _fresh_app(sample_dir).run()
+    at.multiselect(key="f_region").select("Kara").select("Savanes").run()
+    html = _html(at)
+    assert html.count('class="kpi__cmp"') >= 10  # 5 KPI x 2 valeurs
+    assert '<span class="kpi__cv">2</span>' in html  # Kara : 2 entreprises
+    assert '<span class="kpi__cv">1</span>' in html  # Savanes : 1 entreprise
+
+
+def test_comparison_on_a_missing_field_is_flagged_not_faked(sample_dir):
+    at = _fresh_app(sample_dir).run()
+    at.multiselect(key="f_secteur").select("Fintech").select("Télécoms").run()
+    assert not at.exception
+    html = _html(at)
+    assert "Champ absent des données de cet indicateur" in html  # infra n'a pas de secteur
+
+
+def test_compare_helpers():
+    _fresh_app(Path("."))
+    import pandas as pd
+    from utils.compare import relative, top_rows, wide
+    a = pd.DataFrame({"label": ["x", "y", "z"], "valeur": [5, 3, 2]})
+    b = pd.DataFrame({"label": ["x", "w"], "valeur": [1, 9]})
+    table = wide({"A": a, "B": b})
+    assert list(table.columns) == ["A", "B"] and table.loc["w", "A"] == 0
+    top = top_rows(table, 2)
+    assert list(top.index) == ["w", "x", "Autres"] and top.loc["Autres", "A"] == 5
+    assert relative(table)["A"].sum() == pytest.approx(100)
+    assert wide({"A": None, "B": None}) is None
+
+
+def test_compared_values_match_an_independent_pandas_computation(sample_dir):
+    _fresh_app(sample_dir)
+    import pandas as pd
+    from utils.compare import get_comparison
+    from utils.data_loader import load_datasets
+    from utils.filters import Filters
+    from utils.metrics import compare_kpis
+
+    ds = load_datasets()
+    f = Filters(start=2023, end=2025, region=("Kara", "Savanes"))
+    cmp = get_comparison(f)
+    assert cmp.dim == "region" and cmp.values == ("Kara", "Savanes")
+    rows = compare_kpis(ds, f, cmp)
+    raw = pd.read_csv(sample_dir / "entreprises.csv")
+    for row, region in zip(rows, ("Kara", "Savanes")):
+        sub = raw[raw["Région"] == region]
+        assert row[0].value == len(sub)             # entreprises
+        assert row[1].value == sub["Emplois"].sum()  # emplois

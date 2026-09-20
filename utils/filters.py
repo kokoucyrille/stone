@@ -1,7 +1,7 @@
-"""Filtres : état, sidebar et application aux jeux de données."""
+"""Filtres : état, sidebar (sélection multiple, jusqu'à 2 valeurs par champ) et application."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pandas as pd
 import streamlit as st
@@ -17,19 +17,23 @@ DIMENSIONS = (
 
 @dataclass(frozen=True)
 class Filters:
+    """Une dimension vide = aucun filtre ; 1 valeur = filtre ; 2 valeurs = comparaison."""
     start: int | None = None
     end: int | None = None
-    region: str | None = None
-    prefecture: str | None = None
-    secteur: str | None = None
-    type_acteur: str | None = None
-    statut: str | None = None
-    taille: str | None = None
-    niveau_connexion: str | None = None
-    type_infrastructure: str | None = None
+    region: tuple[str, ...] = ()
+    prefecture: tuple[str, ...] = ()
+    secteur: tuple[str, ...] = ()
+    type_acteur: tuple[str, ...] = ()
+    statut: tuple[str, ...] = ()
+    taille: tuple[str, ...] = ()
+    niveau_connexion: tuple[str, ...] = ()
+    type_infrastructure: tuple[str, ...] = ()
 
-    def dims(self) -> dict[str, str]:
-        return {d: getattr(self, d) for d in DIMENSIONS if getattr(self, d)}
+    def dims(self) -> dict[str, tuple[str, ...]]:
+        return {d: tuple(getattr(self, d)) for d in DIMENSIONS if getattr(self, d)}
+
+    def with_dim(self, dim: str, values) -> "Filters":
+        return replace(self, **{dim: tuple(values)})
 
     @property
     def single_year(self) -> bool:
@@ -41,10 +45,10 @@ class Filters:
 # --------------------------------------------------------------------------- #
 def apply_dims(df: pd.DataFrame, f: Filters, skip: tuple[str, ...] = ()) -> pd.DataFrame:
     """Applique les filtres dimensionnels dont la colonne existe dans `df`."""
-    for column, value in f.dims().items():
+    for column, values in f.dims().items():
         if column in skip or column not in df.columns:
             continue
-        df = df[df[column] == value]
+        df = df[df[column].isin(list(values))]
     return df
 
 
@@ -120,14 +124,30 @@ def _reset() -> None:
 
 
 def _select(key: str, label: str, options: list[str], *, icon: str | None = None,
-            disabled: bool = False, collapsed: bool = False, help: str | None = None) -> str:
+            disabled: bool = False, help: str | None = None) -> str:
+    """Sélection unique (période)."""
     if st.session_state.get(key) not in options:
         st.session_state[key] = options[0]
     shown = f":material/{icon}: {label}" if icon else label
-    return st.selectbox(
-        shown, options, key=key, disabled=disabled, help=help,
+    return st.selectbox(shown, options, key=key, disabled=disabled, help=help)
+
+
+def _multi(key: str, label: str, options: list[str], placeholder: str, *,
+           icon: str | None = None, disabled: bool = False, collapsed: bool = False,
+           help: str | None = None) -> tuple[str, ...]:
+    """Sélection multiple limitée à MAX_COMPARE valeurs ; vide = « tout »."""
+    current = st.session_state.get(key)
+    if current is not None:
+        valid = [v for v in current if v in options][: C.MAX_COMPARE]
+        if valid != list(current):
+            st.session_state[key] = valid
+    shown = f":material/{icon}: {label}" if icon else label
+    picked = st.multiselect(
+        shown, options, key=key, max_selections=C.MAX_COMPARE, placeholder=placeholder,
+        disabled=disabled, help=help,
         label_visibility="collapsed" if collapsed else "visible",
     )
+    return tuple(picked)
 
 
 def _dim_options(ds: Datasets, dim: str) -> tuple[list[str], str | None]:
@@ -163,33 +183,36 @@ def render_sidebar(ds: Datasets) -> Filters:
             st.button("Réinitialiser", icon=":material/restart_alt:", key="btn_reset",
                       on_click=_reset, type="tertiary")
 
-        # Période
+        # Période (sélection unique)
         periods = period_options(years)
         period = _select("f_periode", "Période", periods, icon="calendar_month",
                          disabled=not years, help=period_help)
 
-        chosen: dict[str, str | None] = {}
+        chosen: dict[str, tuple[str, ...]] = {}
         prefectures = ds.prefectures_by_region()
         for dim, key, label, icon in _SIMPLE:
             options, hint = _dim_options(ds, dim)
             if dim == "prefecture":
-                region = st.session_state.get("f_region")
-                if region in prefectures:
-                    options = prefectures[region]
-            all_label = C.ALL_LABELS[dim]
-            value = _select(key, label, [all_label] + options, icon=icon,
-                            disabled=not options, help=hint)
-            chosen[dim] = None if value == all_label else value
+                regions = st.session_state.get("f_region") or []
+                scoped = sorted({p for r in regions for p in prefectures.get(r, [])})
+                if scoped:
+                    options = scoped
+            chosen[dim] = _multi(key, label, options, C.ALL_LABELS[dim], icon=icon,
+                                 disabled=not options, help=hint)
 
         with st.expander("Filtres avancés", icon=":material/filter_alt:", expanded=False):
             for dim, key, label in _ADVANCED:
                 options, hint = _dim_options(ds, dim)
                 on = st.checkbox(label, key=key + "_on", disabled=not options, help=hint)
-                all_label = C.ALL_LABELS[dim]
-                value = _select(key, label, [all_label] + options,
+                picked = _multi(key, label, options, C.ALL_LABELS[dim],
                                 disabled=not (on and options), collapsed=True)
-                chosen[dim] = value if (on and value != all_label) else None
+                chosen[dim] = picked if on else ()
 
+        st.markdown(
+            '<div class="sb-hint">Astuce : choisissez 2 valeurs dans un même champ '
+            "pour les comparer.</div>",
+            unsafe_allow_html=True,
+        )
         st.markdown(_sidebar_decoration(), unsafe_allow_html=True)
 
     start, end = parse_period(period, years)

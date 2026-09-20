@@ -71,7 +71,8 @@ def _polygon_xy(geometry: dict) -> tuple[list, list]:
 
 
 def region_map(regions: pd.DataFrame | None, height: int = 420, unit: str = "entreprises",
-               value_format=fmt_int, highlight: str | None = None) -> go.Figure:
+               value_format=fmt_int, highlight=None,
+               colors: dict[str, str] | None = None) -> go.Figure:
     """Carte des régions ; sans données, les polygones restent neutres.
 
     Le tracé utilise des polygones Scatter (et non `go.Choropleth`) : aucune
@@ -81,6 +82,8 @@ def region_map(regions: pd.DataFrame | None, height: int = 420, unit: str = "ent
     values = {} if regions is None or regions.empty else dict(zip(regions["label"], regions["valeur"]))
     parts = {} if regions is None or regions.empty or "part" not in regions else \
         dict(zip(regions["label"], regions["part"]))
+    colors = colors or {}
+    highlighted = {highlight} if isinstance(highlight, str) else set(highlight or ())
     fig = go.Figure()
     polygon_names: set[str] = set()
     lons: list[float] = []
@@ -92,8 +95,8 @@ def region_map(regions: pd.DataFrame | None, height: int = 420, unit: str = "ent
         name = props["region"]
         polygon_names.add(name)
         has = name in values
-        selected = not values and highlight == name  # filtre actif, pas encore de données
-        color = region_color(name, i) if (has or selected) else C.COLORS["empty"]
+        selected = not values and name in highlighted  # filtre actif, pas encore de données
+        color = colors.get(name) or region_color(name, i) if (has or selected) else C.COLORS["empty"]
         hover = (f"<b>{name}</b><br>{value_format(values[name])} {unit}"
                  + (f" ({fmt_pct(parts[name])})" if name in parts else "")
                  if has else f"<b>{name}</b><br>"
@@ -125,7 +128,7 @@ def region_map(regions: pd.DataFrame | None, height: int = 420, unit: str = "ent
             lat, lon = C.GEO_POINTS[name]
             fig.add_trace(go.Scatter(
                 x=[lon], y=[lat], mode="markers+text", showlegend=False,
-                marker=dict(size=12 + 16 * math.sqrt(value / vmax), color=region_color(name, i),
+                marker=dict(size=12 + 16 * math.sqrt(value / vmax), color=colors.get(name) or region_color(name, i),
                             line=dict(color="#FFFFFF", width=1.5)),
                 text=[f"{name}<br><b>{value_format(value)}</b>"], textposition="bottom center",
                 textfont=dict(family=FONT, size=11, color=NAVY),
@@ -281,4 +284,68 @@ def heatmap(table: pd.DataFrame, height: int = 300) -> go.Figure:
     fig.update_xaxes(side="top", tickfont=dict(size=11, color=SLATE), fixedrange=True)
     fig.update_yaxes(autorange="reversed", tickfont=dict(size=11, color=SLATE), fixedrange=True,
                      automargin=True)
+    return fig
+
+
+# --------------------------------------------------------------------------- #
+# Comparaison A / B
+# --------------------------------------------------------------------------- #
+def compare_lines(series: dict[str, pd.Series], colors: dict[str, str], height: int = 210) -> go.Figure:
+    fig = go.Figure()
+    top = 1.0
+    for name, s in series.items():
+        xs = [int(y) for y in s.index]
+        ys = [float(v) for v in s.values]
+        top = max([top] + ys)
+        color = colors.get(name, C.COLORS["green"])
+        labels = [""] * (len(ys) - 1) + [fmt_int(ys[-1])] if ys else []
+        fig.add_trace(go.Scatter(
+            x=xs, y=ys, mode="lines+markers+text", name=name,
+            line=dict(color=color, width=2.6),
+            marker=dict(size=7, color="#FFFFFF", line=dict(color=color, width=2.2)),
+            text=labels, textposition="top center", textfont=dict(size=11, color=color),
+            hovertemplate=f"<b>{name}</b> · %{{x}} : %{{y:,.0f}}<extra></extra>", cliponaxis=False,
+        ))
+    years = sorted({int(y) for s in series.values() for y in s.index})
+    fig.update_layout(**_layout(
+        height, margin=dict(l=44, r=22, t=30, b=26),
+        legend=dict(orientation="h", x=0, y=1.16, font=dict(size=11.5)),
+    ))
+    fig.update_xaxes(tickmode="array", tickvals=years, showgrid=False, linecolor=GRID,
+                     tickfont=dict(size=11, color=MUTED), fixedrange=True)
+    fig.update_yaxes(range=[0, top * 1.22], gridcolor=GRID, zeroline=False, tickformat=",d",
+                     tickfont=dict(size=11, color=MUTED), fixedrange=True, nticks=6)
+    return fig
+
+
+def grouped_hbars(table: pd.DataFrame, colors: dict[str, str], height: int = 200,
+                  stack: bool = False, percent: bool = False) -> go.Figure:
+    """Barres horizontales A / B par libellé (`table` : index = libellés, colonnes = séries)."""
+    fmt = (lambda v: fmt_pct(v, 1)) if percent else fmt_int
+    labels = [str(i) for i in table.index]
+    fig = go.Figure()
+    for name in table.columns:
+        vals = [float(v) for v in table[name]]
+        fig.add_trace(go.Bar(
+            y=labels, x=vals, name=str(name), orientation="h",
+            marker=dict(color=colors.get(name, C.COLORS["green"])),
+            text=[fmt(v) if (v and not stack) else "" for v in vals],
+            textposition="outside", textfont=dict(size=10.5, color=NAVY), cliponaxis=False,
+            hovertemplate=f"<b>%{{y}}</b> · {name} : %{{x:,.1f}}" + ("%" if percent else "")
+                          + "<extra></extra>",
+        ))
+    xmax = float(table.sum(axis=1).max() if stack else table.values.max()) or 1.0
+    if stack:
+        for label, total in zip(labels, table.sum(axis=1)):
+            fig.add_annotation(x=xmax * 1.03, y=label, text=fmt(total), showarrow=False,
+                               xanchor="left", font=dict(size=11, color=NAVY))
+    fig.update_layout(**_layout(
+        height, barmode="stack" if stack else "group", bargap=0.28,
+        margin=dict(l=4, r=40, t=34, b=2),
+        legend=dict(orientation="h", x=0, y=1.0, yanchor="bottom", traceorder="normal",
+                    font=dict(size=11.5)),
+    ))
+    fig.update_xaxes(visible=False, range=[0, xmax * 1.28], fixedrange=True)
+    fig.update_yaxes(autorange="reversed", showgrid=False, tickfont=dict(size=11, color=NAVY),
+                     fixedrange=True, automargin=True)
     return fig

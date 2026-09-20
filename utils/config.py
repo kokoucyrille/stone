@@ -175,6 +175,21 @@ REFERENCE_OPTIONS = {
     "secteur": ["Télécoms", "Services IT", "Fintech", "E-commerce", "EdTech"],
 }
 
+# Comparaison : jusqu'à MAX_COMPARE valeurs dans un même champ de filtre ; chaque valeur
+# reçoit une couleur fixe (A = vert, B = orange) dans tout le tableau de bord.
+MAX_COMPARE = 2
+COMPARE_COLORS = ["#0B6B4F", "#F28C28"]
+DIM_LABELS = {
+    "region": "Région",
+    "prefecture": "Préfecture",
+    "secteur": "Secteur d'activité",
+    "type_acteur": "Type d'acteur",
+    "statut": "Statut",
+    "taille": "Taille",
+    "niveau_connexion": "Niveau de connexion",
+    "type_infrastructure": "Type d'infrastructure",
+}
+
 ALL_LABELS = {
     "region": "Toutes les régions",
     "prefecture": "Toutes les préfectures",

@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from . import config as C
+from .compare import Comparison, supports
 from .data_loader import Datasets
 from .filters import Filters, apply_dims, latest_snapshot, upto_year
 from .formatting import fmt_dec, fmt_int, fmt_pct, norm_key
@@ -38,6 +39,7 @@ class Kpi:
     delta: float | None = None
     delta_unit: str = "%"
     delta_label: str | None = None   # « vs. 2024 »
+    dataset: str = "entreprises"     # jeu de données source (pour la comparaison)
 
 
 def format_kpi_value(kpi: Kpi) -> str:
@@ -115,7 +117,22 @@ def compute_kpis(ds: Datasets, f: Filters) -> list[Kpi]:
     v, d, lab = _stock_kpi(ent, "investissement_mds_fcfa", f, y_min)
     kpis.append(Kpi("investissements", "Investissements (Mds F CFA)", "database", "teal", v, "dec",
                     d, delta_label=lab))
+    source = {"couverture": "connectivite", "infrastructures": "infrastructures"}
+    for k in kpis:
+        k.dataset = source.get(k.key, "entreprises")
     return kpis
+
+
+def compare_kpis(ds: Datasets, f: Filters, cmp: Comparison) -> list[list[Kpi | None]]:
+    """KPI recalculés pour chaque valeur comparée ; None si le champ n'existe pas dans le jeu."""
+    rows = []
+    for _, fi in cmp.series(f):
+        # Jeu absent : la carte affiche « — » ; jeu présent sans le champ : comparaison impossible.
+        rows.append([
+            k if (ds.get(k.dataset) is None or supports(ds, k.dataset, cmp.dim)) else None
+            for k in compute_kpis(ds, fi)
+        ])
+    return rows
 
 
 # --------------------------------------------------------------------------- #

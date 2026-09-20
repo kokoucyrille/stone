@@ -112,6 +112,25 @@ def page_header(title: str, subtitle: str) -> None:
 # --------------------------------------------------------------------------- #
 # Cartes et états vides
 # --------------------------------------------------------------------------- #
+def compare_bar(cmp) -> None:
+    """Bandeau discret rappelant les deux valeurs comparées et leurs couleurs."""
+    if not cmp.active:
+        return
+    chips = "".join(
+        f'<span class="cmp__chip"><i style="background:{cmp.color(i)}"></i>{html_escape(v)}</span>'
+        for i, v in enumerate(cmp.values)
+    )
+    extra = ""
+    if cmp.extra:
+        extra = ('<span class="cmp__note">Autres champs à 2 valeurs, cumulés : '
+                 f'{html_escape(", ".join(cmp.extra))}</span>')
+    st.markdown(
+        f'<div class="cmp">{icon("compare_arrows")}<span class="cmp__title">Comparaison · '
+        f'{html_escape(cmp.label)}</span>{chips}{extra}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def card_title(mat_icon: str, title: str, note: str | None = None) -> None:
     right = f'<span class="ct__note">{html_escape(note)}</span>' if note else ""
     st.markdown(

@@ -51,6 +51,22 @@ Déposez vos fichiers (CSV, Excel ou Parquet) dans `data/`, **ou** utilisez le b
   (`PERIOD_FALLBACK`, `REFERENCE_OPTIONS` dans `utils/config.py`) et la région choisie
   s'illumine sur la carte ; aucune valeur n'est simulée.
 
+## Comparaison de deux valeurs
+
+Chaque champ de filtre (sauf la période) accepte **jusqu'à 2 valeurs** : sélectionnez-en deux
+(ex. Région : Kara et Maritime) pour lancer une comparaison. Un bandeau rappelle les deux valeurs
+et leurs couleurs (A vert, B orange ; modifiables via `COMPARE_COLORS` dans `utils/config.py`).
+
+- **KPI** : chaque carte affiche une ligne par valeur, avec sa variation.
+- **Graphiques** : évolution en deux courbes, répartitions en barres A / B, carte et accès à Internet
+  aux couleurs A / B quand on compare des régions. Si le graphique est déjà ventilé par le champ
+  comparé (ex. secteurs quand on compare deux secteurs), les deux valeurs y figurent directement.
+- **Champ absent** : si un jeu de données ne contient pas le champ comparé (ex. `secteur` dans
+  `infrastructures`), la carte l'indique (« Comparaison non applicable ») au lieu d'afficher
+  des chiffres identiques.
+- **Plusieurs champs à 2 valeurs** : le premier de la sidebar (Région, Préfecture, Secteur…) sert
+  à comparer ; les autres sont cumulés, et le bandeau le précise.
+
 ## Règles de calcul
 
 - **Année de référence** = fin de la période choisie dans la sidebar.

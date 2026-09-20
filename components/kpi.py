@@ -14,9 +14,34 @@ from utils.metrics import Kpi, format_kpi_value
 from .layout import icon
 
 
-def kpi_row(kpis: list[Kpi]) -> None:
+def _cmp_row(k: Kpi | None, color: str) -> str:
+    if k is None or k.value is None:
+        return f'<div class="kpi__cmp"><i style="background:{color}"></i><span class="kpi__cv">—</span></div>'
+    delta = ""
+    if k.delta is not None:
+        direction = "up" if k.delta >= 0 else "down"
+        arrow = "trending_up" if k.delta >= 0 else "trending_down"
+        delta = (f'<span class="kpi__cd kpi__cd--{direction}">{icon(arrow)}'
+                 f"{fmt_signed(k.delta, 1, k.delta_unit)}</span>")
+    return (f'<div class="kpi__cmp"><i style="background:{color}"></i>'
+            f'<span class="kpi__cv">{format_kpi_value(k)}</span>{delta}</div>')
+
+
+def kpi_row(kpis: list[Kpi], compare: list[list[Kpi | None]] | None = None, cmp=None) -> None:
+    """Rangée de 5 KPI ; en comparaison, chaque carte porte une ligne par valeur (A / B)."""
     cards = []
-    for k in kpis:
+    for idx, k in enumerate(kpis):
+        if compare:
+            if all(series[idx] is None for series in compare):
+                body = '<div class="kpi__delta kpi__delta--na">Champ absent des données de cet indicateur</div>'
+            else:
+                body = "".join(_cmp_row(series[idx], cmp.color(i)) for i, series in enumerate(compare))
+            cards.append(
+                f'<div class="kpi kpi--{k.tone} kpi--compare">'
+                f'<div class="kpi__icon">{icon(k.icon)}</div>'
+                f'<div class="kpi__body"><div class="kpi__label">{html_escape(k.label)}</div>{body}</div></div>'
+            )
+            continue
         if k.value is None:
             delta = '<div class="kpi__delta kpi__delta--na">Donnée non disponible</div>'
         elif k.delta is not None:
@@ -40,18 +65,28 @@ def kpi_row(kpis: list[Kpi]) -> None:
     st.markdown(f'<div class="kpi-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
-def infra_strip(tiles: list[tuple[str, float, str]] | None) -> None:
+def infra_strip(tiles: list[tuple[str, float, str]] | None,
+                compare: list[dict[str, float]] | None = None, cmp=None) -> None:
     """Bloc « Répartition des infrastructures numériques » : icône, libellé, valeur."""
     if tiles is None:
         tiles = [(label, None, icon_name) for label, _, icon_name in C.INFRA_TILES]
     items = []
     for label, value, mat in tiles:
-        shown = "—" if value is None else fmt_int(value)
+        if compare:
+            cells = "".join(
+                f'<span><i style="background:{cmp.color(i)}"></i>'
+                f'{fmt_int(series.get(label, 0))}</span>'
+                for i, series in enumerate(compare)
+            )
+            value_html = f'<div class="tile__value tile__value--cmp">{cells}</div>'
+        else:
+            shown = "—" if value is None else fmt_int(value)
+            value_html = f'<div class="tile__value">{shown}</div>'
         items.append(
             '<div class="tile">'
             f'<span class="tile__icon">{icon(mat)}</span>'
             f'<div class="tile__text"><div class="tile__label">{html_escape(label)}</div>'
-            f'<div class="tile__value">{shown}</div></div></div>'
+            f'{value_html}</div></div>'
         )
     cols = max(1, min(len(tiles), 5))
     st.markdown(f'<div class="strip" style="--cols:{cols}">{"".join(items)}</div>',

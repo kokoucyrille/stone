@@ -9,6 +9,8 @@ import streamlit as st
 from components import charts
 from components.layout import empty_state, legend, plot
 from utils import config as C
+from utils import metrics as M
+from utils.compare import relative, supports, top_rows, wide
 from utils.formatting import fmt_int, fmt_pct
 
 NO_RESULT = "Aucun résultat pour ces filtres"
@@ -48,11 +50,17 @@ def donut_block(data: pd.DataFrame | None, key: str, hint: str, height: int = 20
             st.markdown(legend(rows, "lg--donut"), unsafe_allow_html=True)
 
 
-def region_legend(regions: pd.DataFrame, value_format=fmt_int) -> str:
+def region_colors(cmp) -> dict[str, str] | None:
+    """Couleurs A/B des régions comparées (cohérentes avec les KPI), sinon palette régionale."""
+    return cmp.color_map() if (cmp.active and cmp.dim == "region") else None
+
+
+def region_legend(regions: pd.DataFrame, value_format=fmt_int, colors=None) -> str:
     rows = []
     for i, r in enumerate(regions.itertuples()):
         part = f"({fmt_pct(r.part)})" if hasattr(r, "part") else ""
-        rows.append((charts.region_color(r.label, i), r.label, value_format(r.valeur), part))
+        color = (colors or {}).get(r.label) or charts.region_color(r.label, i)
+        rows.append((color, r.label, value_format(r.valeur), part))
     return legend(rows, "lg--region")
 
 
@@ -114,3 +122,47 @@ def missing(dataset: str, *columns: str) -> str:
 
 
 ENTREPRISES_REGION_HINT = missing("entreprises", "region", "nombre")
+
+
+# --------------------------------------------------------------------------- #
+# Comparaison A / B
+# --------------------------------------------------------------------------- #
+def compare_data(ds, f, cmp, fn, dataset: str, height: int, hint: str):
+    """Séries A/B utilisables, ou None après affichage d'un état vide adapté."""
+    if not supports(ds, dataset, cmp.dim):
+        empty_state(height, "Comparaison non applicable",
+                    hint=f"Le champ « {cmp.label} » est absent de data/{dataset}")
+        return None
+    parts = {label: fn(ds, fi) for label, fi in cmp.series(f)}
+    if all(v is None for v in parts.values()):
+        empty_state(height, hint=hint)
+        return None
+    if all(v is None or len(v) == 0 for v in parts.values()):
+        empty_state(height, NO_RESULT)
+        return None
+    return parts
+
+
+def grouped_block(ds, f, cmp, column: str, height: int, key: str, hint: str, *,
+                  dataset: str = "entreprises", top: int = 6, others: bool = True,
+                  percent: bool = False, stack: bool = False, fn=None) -> None:
+    """Barres horizontales A / B pour une répartition par `column`."""
+    fn = fn or (lambda d, fi: M.group_count(d, fi, column))
+    parts = compare_data(ds, f, cmp, fn, dataset, height, hint)
+    if parts is None:
+        return
+    table = wide(parts)
+    if percent:
+        table = relative(table)
+    table = top_rows(table, top, others)
+    plot(charts.grouped_hbars(table, cmp.color_map(), height, stack=stack, percent=percent), key)
+
+
+def infra_compare(ds, f, cmp):
+    """[{libellé: valeur}] par valeur comparée, ou None si le champ est absent des infrastructures."""
+    if not cmp.active or not supports(ds, "infrastructures", cmp.dim):
+        return None
+    return [
+        {label: value for label, value, _ in (M.infra_tiles(ds, fi, max_tiles=None) or [])}
+        for _, fi in cmp.series(f)
+    ]

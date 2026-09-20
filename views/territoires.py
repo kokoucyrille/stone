@@ -4,13 +4,15 @@ from __future__ import annotations
 import streamlit as st
 
 from components import charts
-from components.layout import card_title, empty_state, page_header, plot, show_table
+from components.layout import card_title, compare_bar, empty_state, page_header, plot, show_table
 from utils import metrics as M
+from utils.compare import by_series, get_comparison, stack_tables, supports
 from utils.data_loader import Datasets
 from utils.filters import Filters
 from utils.formatting import fmt_int, fmt_pct
 
-from .common import NO_RESULT, chart_block, missing, page_intro, region_legend
+from .common import (NO_RESULT, chart_block, grouped_block, missing, page_intro, region_colors,
+                     region_legend)
 
 
 def _metric_options(ds: Datasets, f: Filters) -> dict[str, tuple]:
@@ -34,6 +36,8 @@ def _metric_options(ds: Datasets, f: Filters) -> dict[str, tuple]:
 def render(ds: Datasets, f: Filters) -> None:
     page_header("Territoires", "Répartition territoriale de l'économie numérique.")
     page_intro(ds)
+    cmp = get_comparison(f)
+    compare_bar(cmp)
 
     left, right = st.columns([55, 45], gap="small")
     with left:
@@ -50,18 +54,28 @@ def render(ds: Datasets, f: Filters) -> None:
             legend_col, map_col = st.columns([38, 62], vertical_alignment="center")
             with legend_col:
                 if usable is not None:
-                    st.markdown(region_legend(usable, fmt), unsafe_allow_html=True)
+                    st.markdown(region_legend(usable, fmt, region_colors(cmp)), unsafe_allow_html=True)
                 else:
                     empty_state(300, hint=missing("entreprises", "region", "nombre"))
             with map_col:
-                plot(charts.region_map(usable, 470, unit, fmt, highlight=f.region), "terr_map")
+                plot(charts.region_map(usable, 470, unit, fmt, highlight=f.region,
+                                       colors=region_colors(cmp)), "terr_map")
     with right:
         with st.container(key="card_terr_table"):
             card_title("table_chart", "Synthèse par territoire")
             tab_region, tab_pref = st.tabs(["Par région", "Par préfecture"])
             for tab, column in ((tab_region, "region"), (tab_pref, "prefecture")):
                 with tab:
-                    table = M.summary_table(ds, f, column)
+                    if cmp.is_split(column):
+                        if not supports(ds, "entreprises", cmp.dim):
+                            empty_state(300, "Comparaison non applicable",
+                                        hint=f"Le champ « {cmp.label} » est absent de data/entreprises")
+                            continue
+                        table = stack_tables(by_series(
+                            ds, f, cmp, lambda d, fi, c=column: M.summary_table(d, fi, c),
+                            "entreprises"))
+                    else:
+                        table = M.summary_table(ds, f, column)
                     if table is None:
                         empty_state(300, hint=missing("entreprises", column, "nombre"))
                     elif table.empty:
@@ -74,9 +88,14 @@ def render(ds: Datasets, f: Filters) -> None:
     with a:
         with st.container(key="card_terr_top"):
             card_title("account_balance", "Top 10 des préfectures par nombre d'entreprises")
-            chart_block(M.top_prefectures(ds, f, 10), 300,
-                        lambda d: charts.top_bars(d, 300), "terr_top",
-                        missing("entreprises", "prefecture", "nombre"))
+            if cmp.is_split("prefecture"):
+                grouped_block(ds, f, cmp, "prefecture", 300, "terr_top_cmp",
+                              missing("entreprises", "prefecture", "nombre"), top=10,
+                              others=False, stack=cmp.dim == "region")
+            else:
+                chart_block(M.top_prefectures(ds, f, 10), 300,
+                            lambda d: charts.top_bars(d, 300), "terr_top",
+                            missing("entreprises", "prefecture", "nombre"))
     with b:
         with st.container(key="card_terr_net"):
             card_title("signal_cellular_alt", "Accès à Internet par région")
