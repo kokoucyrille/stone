@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
 
 /* ========================================================================
    TOGO DIGITAL INTELLIGENCE — charte graphique
@@ -18,8 +18,10 @@
   --bg: #F5F7FA;
   --card: #FFFFFF;
   --topbar-h: 62px;
+  --topbar-gap: 16px;       /* respiration entre le haut de la fenêtre et la barre de navigation */
   --sidebar-w: 248px;
   --font: 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Liberation Sans', sans-serif;
+  --font-display: 'Manrope', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--font); }
@@ -39,14 +41,14 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 [data-testid="stToolbarActions"], [data-testid="stStatusWidget"] { display: none !important; }
 [data-testid="stHeader"] { background: transparent; height: 0; min-height: 0; pointer-events: none; z-index: 1000003; }
 [data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapsedControl"] {
-  pointer-events: auto; position: fixed; top: 9px; left: 8px; z-index: 1000002;
+  pointer-events: auto; position: fixed; top: calc(var(--topbar-gap) + 9px); left: 8px; z-index: 1000002;
 }
 [data-testid="stElementContainer"]:has(style) { display: none; }
 [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 
-[data-testid="stAppViewContainer"] { padding-top: var(--topbar-h); box-sizing: border-box; }
+[data-testid="stAppViewContainer"] { padding-top: calc(var(--topbar-h) + var(--topbar-gap)); box-sizing: border-box; }
 [data-testid="stMainBlockContainer"] {
-  padding: 8px 16px 8px 14px !important; max-width: 100% !important;
+  padding: 8px 16px 24px 14px !important; max-width: 100% !important;
 }
 [data-testid="stMain"] [data-testid="stVerticalBlock"] { gap: .65rem; }
 [data-testid="stMain"] [data-testid="stHorizontalBlock"] { gap: .65rem; }
@@ -55,7 +57,7 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
    Barre de navigation
    ======================================================================== */
 .st-key-topbar {
-  position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-h); z-index: 1000000;
+  position: fixed; top: var(--topbar-gap); left: 0; right: 0; height: var(--topbar-h); z-index: 1000000;
   background: #FFFFFF; border-bottom: 1px solid var(--grid);
   box-shadow: 0 1px 8px rgba(11, 31, 51, .05);
   padding: 0 18px 0 16px; display: flex; align-items: center; gap: 0 !important;
@@ -69,7 +71,10 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand__logo svg { width: 44px; height: 44px; display: block; }
 .brand__text { min-width: 0; }
-.brand__title { font-size: 19px; font-weight: 700; color: var(--navy); line-height: 1.1; letter-spacing: .1px; white-space: nowrap; }
+.brand__title {
+  font-family: var(--font-display); font-size: 19px; font-weight: 800; color: var(--navy);
+  line-height: 1.15; letter-spacing: -.1px; white-space: nowrap;
+}
 .brand__sub { font-size: 11.5px; color: var(--slate); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .st-key-topbar .stButton { width: 100%; }
@@ -77,7 +82,7 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
   width: 100%; height: 40px; min-height: 40px; padding: 0 10px; border-radius: 8px;
   border: 0; box-shadow: none; gap: 8px; justify-content: center;
 }
-.st-key-topbar .stButton button p { font-size: 13.5px; font-weight: 500; color: var(--navy); white-space: nowrap; }
+.st-key-topbar .stButton button p { font-size: 13.5px; font-weight: 600; color: var(--navy); white-space: nowrap; }
 .st-key-topbar .stButton button [data-testid="stIconMaterial"] { font-size: 21px; color: var(--green-dark); }
 .st-key-topbar .stButton button:hover { background: #EDF4F1; }
 .st-key-topbar .stButton button[kind="primary"],
@@ -139,7 +144,7 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
   justify-content: flex-end; gap: 4px;
 }
 [data-testid="stSidebar"] .stButton { display: flex; justify-content: flex-end; }
-[data-testid="stSidebar"] .stButton button p { color: #fff; font-size: 11.5px; }
+[data-testid="stSidebar"] .stButton button p { color: #fff; font-size: 11.5px; font-weight: 600; }
 [data-testid="stSidebar"] .stButton button [data-testid="stIconMaterial"] { color: #fff; font-size: 16px; }
 [data-testid="stSidebar"] .stButton button:hover { background: rgba(255, 255, 255, .08); }
 
@@ -189,7 +194,8 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 .hero__stripes { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero__text {
   position: absolute; left: 34px; top: 50%; transform: translateY(-50%);
-  display: flex; flex-direction: column; color: #fff; font-size: 22px; line-height: 1.1; font-weight: 700;
+  display: flex; flex-direction: column; color: #fff; font-size: 22px; line-height: 1.15;
+  font-family: var(--font-display); font-weight: 800; letter-spacing: -.2px;
 }
 .hero__text .y { color: var(--yellow); }
 
@@ -214,8 +220,11 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 }
 .kpi__icon .msr { font-size: 26px; }
 .kpi__body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.kpi__label { font-size: clamp(11.5px, 5.1cqw, 13px); color: var(--slate); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.kpi__value { font-size: clamp(22px, 12.6cqw, 32px); line-height: 1.1; font-weight: 700; color: var(--navy); letter-spacing: -.3px; margin: 3px 0 2px; }
+.kpi__label { font-size: clamp(11.5px, 5.1cqw, 13px); font-weight: 500; color: var(--slate); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi__value {
+  font-family: var(--font-display); font-size: clamp(22px, 12.6cqw, 32px); line-height: 1.1;
+  font-weight: 800; color: var(--navy); letter-spacing: -.4px; margin: 3px 0 2px;
+}
 .kpi__delta { display: flex; align-items: center; gap: 5px; font-size: 14px; }
 .kpi__delta .msr { font-size: 18px; }
 .kpi__delta--up { color: var(--ok); }
@@ -231,7 +240,10 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
   padding: 9px 14px 9px; box-shadow: 0 1px 2px rgba(11, 31, 51, .04); gap: .25rem !important;
 }
 .st-key-card_infra, .st-key-card_ind { min-height: 112px; }
-.ct { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--navy); min-height: 24px; min-width: 0; }
+.ct {
+  display: flex; align-items: center; gap: 7px; font-family: var(--font-display); font-size: 13px;
+  font-weight: 700; color: var(--navy); min-height: 24px; min-width: 0;
+}
 .ct > span:not(.msr):not(.ct__note) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ct .msr { font-size: 19px; color: var(--green); flex: 0 0 auto; }
 .ct__note { margin-left: auto; font-size: 11.5px; font-weight: 400; color: var(--muted); }
@@ -275,7 +287,10 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 .tile__icon .msr { font-size: 24px; }
 .tile__text { min-width: 0; }
 .tile__label { font-size: 11.5px; color: var(--slate); line-height: 1.25; overflow-wrap: anywhere; }
-.tile__value { font-size: 24px; font-weight: 700; color: #0B3A6B; line-height: 1.2; letter-spacing: -.2px; }
+.tile__value {
+  font-family: var(--font-display); font-size: 24px; font-weight: 700; color: #0B3A6B;
+  line-height: 1.2; letter-spacing: -.2px;
+}
 .tile--ind { flex-direction: column; align-items: flex-start; gap: 6px; }
 .tile--ind:first-child { padding-left: 4px; }
 .tile__head { display: flex; align-items: center; gap: 10px; }
@@ -284,7 +299,10 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 .tile__value--green { color: var(--green); font-size: 24px; padding-left: 2px; }
 
 /* En-têtes des vues secondaires */
-.page-head h1 { margin: 2px 0 2px; padding: 0; font-size: 22px; font-weight: 700; color: var(--navy); letter-spacing: -.2px; }
+.page-head h1 {
+  margin: 2px 0 2px; padding: 0; font-family: var(--font-display); font-size: 22px;
+  font-weight: 800; color: var(--navy); letter-spacing: -.3px;
+}
 .page-head p { margin: 0; font-size: 13px; color: var(--muted); }
 .page-head { border-left: 4px solid var(--green); padding-left: 12px; margin-bottom: 2px; }
 
@@ -369,7 +387,10 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 .kpi--compare .kpi__label { margin-bottom: 2px; }
 .kpi__cmp { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
 .kpi__cmp i { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; align-self: center; }
-.kpi__cv { font-size: clamp(17px, 9.2cqw, 24px); font-weight: 700; color: var(--navy); line-height: 1.15; }
+.kpi__cv {
+  font-family: var(--font-display); font-size: clamp(17px, 9.2cqw, 24px); font-weight: 700;
+  color: var(--navy); line-height: 1.15;
+}
 .kpi__cd { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 600; }
 .kpi__cd .msr { font-size: 15px; }
 .kpi__cd--up { color: var(--ok); }
@@ -458,7 +479,7 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
 }
 @media (max-width: 767px) {
   /* Sous 768 px Streamlit place le contenu sous la barre fixe : on compense. */
-  [data-testid="stMainBlockContainer"] { padding-top: calc(var(--topbar-h) + 12px) !important; }
+  [data-testid="stMainBlockContainer"] { padding-top: calc(var(--topbar-h) + var(--topbar-gap) + 12px) !important; }
 }
 @media (max-width: 520px) {
   .hero__text { font-size: 18px; }
@@ -467,7 +488,7 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * { font-family: var(--
   .hero__photo { width: 40%; }
 }
 @media (min-width: 992px) {
-  [data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapsedControl"] { top: calc(var(--topbar-h) + 8px); }
+  [data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapsedControl"] { top: calc(var(--topbar-h) + var(--topbar-gap) + 8px); }
 }
 @media (max-height: 760px) {
   .sb-deco { display: none; }
